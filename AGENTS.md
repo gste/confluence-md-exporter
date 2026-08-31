@@ -88,8 +88,9 @@ Details: `docs/process/roles.md`.
 2. Implement the smallest change that satisfies DoD.
 3. Add or adjust tests required by the task or by the testing section of the Specification.
 4. If the task allows spec edits: change only the anchors listed in the Spec delta, phrased as if the requirement had always been that way, then check `git diff -- docs/spec/` against that list. Anything extra is reverted or escalated.
-5. Keep commits focused; PR description cites spec paths (e.g. `docs/spec/0X-name.md#anchor`).
-6. If blocked by a missing or contradictory requirement → stop; propose `spec-patch` (and ADR if non-obvious). Do not guess product intent.
+5. If the operator surface changed (CLI, env, input, exit codes, output layout, report/manifest shape), update the root `README.md` how-to; it is not a second specification. Otherwise say `README unchanged`.
+6. Keep commits focused; PR description cites spec paths (e.g. `docs/spec/0X-name.md#anchor`).
+7. If blocked by a missing or contradictory requirement → stop; propose `spec-patch` (and ADR if non-obvious). Do not guess product intent.
 
 ## PR expectations
 
