@@ -44,10 +44,10 @@ uv run --env-file .env confluence-md-exporter
 
 ## Выход
 
-Корень по умолчанию — `data/`:
+Корень по умолчанию — `output/`:
 
 ```text
-data/
+output/
 ├── 01_raw/
 ├── 02_interim/
 ├── 03_assets/
