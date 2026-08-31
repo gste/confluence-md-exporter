@@ -99,6 +99,7 @@
    Обязательно: kind (feature | bug); цель в 1-3 предложениях; ссылки на docs/spec/ с якорями;
    in scope / out of scope; Definition of Done (поведение, тесты, файлы);
    разрешены ли правки спеки (по умолчанию — нет).
+   Для bug ещё opened (YYYY-MM-DD); опциональный Run без секретов.
    Имя файла NN-feature-<slug>.md или NN-bug-<slug>.md.
    Ветка: feature/<slug> или bugfix/<slug> по kind (не task/).
    Запрещено: копировать требования из спеки, приводить альтернативные варианты дизайна.
