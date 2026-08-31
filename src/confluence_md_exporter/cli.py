@@ -9,9 +9,10 @@ import sys
 from collections.abc import Callable, Mapping, Sequence
 
 from confluence_md_exporter.client import ConfluenceClient
+from confluence_md_exporter.flow import export_flow
 from confluence_md_exporter.settings import ConfigError, Settings, load_settings
 
-ExportFn = Callable[[Settings], None]
+ExportFn = Callable[[Settings], int | None]
 AuthProbe = Callable[[Settings], None]
 
 
@@ -67,8 +68,10 @@ def main(
         return 2
 
     if run_export is not None:
-        run_export(settings)
-    return 0
+        result = run_export(settings)
+    else:
+        result = export_flow(settings)
+    return result if isinstance(result, int) else 0
 
 
 def entry() -> None:
