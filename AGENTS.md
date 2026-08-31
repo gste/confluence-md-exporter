@@ -27,6 +27,7 @@ Rules:
 - **ADR does not replace spec.** An accepted ADR must be reflected as imperative text in `docs/spec/` in the same change set.
 - **Init Requirements do not replace spec.** After the Specification pack is accepted, do not implement from Init or archive.
 - Task files under `docs/todo/` are an inbox (links + DoD only), not a second specification. Each file is `kind: feature` or `kind: bug`; implementation branches are `feature/<slug>` or `bugfix/<slug>`. A `bug` file carries `opened` (YYYY-MM-DD) and may include a `Run` note without secrets.
+- User-facing chat follows the Language table in `docs/process/README.md` (Russian), even though this file is English. Exception: the human wrote this turn in English.
 
 ## Default reading order
 
