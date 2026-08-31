@@ -13,7 +13,8 @@ Job prompt: реализовать один файл задачи из `docs/tod
 - `stage: spec-first` в `docs/process/STATUS.md`.
 - Указан конкретный файл задачи. Файла нет — ты не Implementer: либо работа 03, либо стоп.
 - Роль на сессию: **Implementer**. ADR не пишешь, эпики не открываешь.
-- В преамбуле указывай тип из задачи (`trivial` | `spec-patch` | `adr+spec`) и якоря спеки, перечисленные в задаче.
+- В преамбуле указывай `kind` из файла (`feature` | `bug`), тип изменения (`trivial` | `spec-patch` | `adr+spec`) и якоря спеки, перечисленные в задаче.
+- Ветка: `feature/<slug>` если `kind: feature`, `bugfix/<slug>` если `kind: bug`. Префикс `task/` не использовать.
 
 ## 1. Work order
 

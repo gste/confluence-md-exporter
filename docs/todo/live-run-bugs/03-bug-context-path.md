@@ -1,5 +1,9 @@
 # 03 — DC context path
 
+## Kind
+
+`bug`
+
 ## Goal
 
 REST и разбор входных URL работают, когда приложение DC смонтировано не в корне origin (типично `/confluence`), без префикса Cloud `/wiki`. Формулировка — только зеркало принятого [ADR 0001](../../decisions/0001-dc-context-path.md).
