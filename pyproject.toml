@@ -7,6 +7,9 @@ dependencies = [
     "prefect>=3,<4",
 ]
 
+[project.scripts]
+confluence-md-exporter = "confluence_md_exporter.cli:entry"
+
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"
