@@ -1,6 +1,11 @@
 # Local data
 data/
 
+# Credentials (keep `.env.example`)
+.env
+.env.*
+!.env.example
+
 # IDE
 .idea/
 .vscode/
@@ -26,3 +31,6 @@ coverage.xml
 *.log
 .hypothesis
 .pytest_cache/
+*.egg-info/
+dist/
+build/
