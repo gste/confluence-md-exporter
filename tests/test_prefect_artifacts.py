@@ -100,6 +100,36 @@ def test_ok_page_gets_markdown_preview_and_run_summary_without_tokens(tmp_path: 
     assert settings.confluence_token not in blob
 
 
+def test_run_summary_lists_each_invalid_url_and_reason(tmp_path: Path) -> None:
+    urls = tmp_path / "urls.txt"
+    urls.write_text(
+        "\n".join(
+            [
+                "https://confluence.example.com/x/AbCdEf",
+                "not-a-url",
+            ]
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    published: list[dict[str, object]] = []
+    settings = _settings(tmp_path, urls)
+    client = ConfluenceClient(settings, transport=ScriptedTransport([]), sleep=lambda _d: None)
+
+    code = run_export(settings, client=client, publish=lambda **kw: published.append(kw))
+
+    assert code == 0
+    summary = next(item["markdown"] for item in published if item.get("key") == "run-summary")
+    assert isinstance(summary, str)
+    assert "https://confluence.example.com/x/AbCdEf: tiny_link" in summary
+    assert "not-a-url: unrecognized_form" in summary
+    report = json.loads((tmp_path / "data" / "run_report.json").read_text(encoding="utf-8"))
+    assert report["invalid_urls"] == [
+        {"url": "https://confluence.example.com/x/AbCdEf", "reason": "tiny_link"},
+        {"url": "not-a-url", "reason": "unrecognized_form"},
+    ]
+
+
 def test_flow_does_not_call_confluence_write_api() -> None:
     blob = inspect.getsource(client_mod) + inspect.getsource(flow_mod)
     for verb in ("POST", "PUT", "DELETE", "PATCH"):

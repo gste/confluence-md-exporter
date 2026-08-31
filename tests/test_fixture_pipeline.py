@@ -209,7 +209,7 @@ def test_all_accepted_url_forms_in_input(tmp_path: Path) -> None:
     assert display[0].space_key == "DEV"
     assert display[0].title == "Look Up"
     assert result.pages_total == 8
-    assert any("/x/" in item for item in result.invalid_urls)
+    assert any("/x/" in item.url for item in result.invalid_urls)
 
 
 def test_fixture_pipeline_covers_constructs_fallback_assets_and_catalog(tmp_path: Path) -> None:
@@ -235,7 +235,7 @@ def test_fixture_pipeline_covers_constructs_fallback_assets_and_catalog(tmp_path
     assert report["failed"] == 2
     assert report["skipped"] == 2
     assert report["pages_total"] == 8
-    assert any("/x/" in item for item in report["invalid_urls"])
+    assert any("/x/" in item["url"] for item in report["invalid_urls"])
 
     kitchen = (out / "04_markdown" / "101_kitchen-sink.md").read_text(encoding="utf-8")
     assert kitchen.startswith("---\n")

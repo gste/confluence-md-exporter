@@ -94,7 +94,10 @@ def test_invalid_urls_stay_out_of_manifest(tmp_path: Path) -> None:
             "ok": 1,
             "failed": 0,
             "skipped": 0,
-            "invalid_urls": ["https://confluence.example.com/x/tiny", "not-a-url"],
+            "invalid_urls": [
+                {"url": "https://confluence.example.com/x/tiny", "reason": "tiny_link"},
+                {"url": "not-a-url", "reason": "unrecognized_form"},
+            ],
             "force_refresh": False,
             "errors": [],
         },
@@ -115,5 +118,8 @@ def test_invalid_urls_stay_out_of_manifest(tmp_path: Path) -> None:
         "errors",
     ):
         assert key in payload
-    assert payload["invalid_urls"] == ["https://confluence.example.com/x/tiny", "not-a-url"]
+    assert payload["invalid_urls"] == [
+        {"url": "https://confluence.example.com/x/tiny", "reason": "tiny_link"},
+        {"url": "not-a-url", "reason": "unrecognized_form"},
+    ]
     assert payload["errors"] == []
