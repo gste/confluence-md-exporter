@@ -90,7 +90,7 @@ Details: `docs/process/roles.md`.
 1. Read the task file — including its Spec delta — and **linked** spec sections only. A branch diff replaces neither.
 2. Implement the smallest change that satisfies DoD.
 3. Add or adjust tests required by the task or by the testing section of the Specification.
-4. If the task allows spec edits: change only the anchors listed in the Spec delta, phrased as if the requirement had always been that way, then check `git diff -- docs/spec/` against that list. Anything extra is reverted or escalated.
+4. If the task allows spec edits: change only the anchors listed in the Spec delta, phrased as if the requirement had always been that way, then check `git diff -- docs/spec/` against that list. Anything extra is reverted or escalated. If `docs/spec/**` was not edited, say `spec unchanged` in the closing answer.
 5. If the operator surface changed (CLI, env, input, exit codes, output layout, report/manifest shape), update the root `README.md` how-to; it is not a second specification. Otherwise say `README unchanged`.
 6. Commit each completed step yourself (`git add` only that step’s files). For `spec-patch`: spec commit, then code commit. Do not wait to be asked. Commit messages in English. Do not amend, push, or merge to the default branch.
 7. When closing the slice: delete the inbox file, append Closed in `docs/todo/README.md`, add one Unreleased bullet to `CHANGELOG.md` (`- NN short phrase`). PR description cites spec paths (e.g. `docs/spec/0X-name.md#anchor`).
