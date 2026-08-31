@@ -30,6 +30,18 @@ CALLOUT_TYPE = {
 HEADINGS = {f"h{i}": i for i in range(1, 7)}
 PREVIEW_SUFFIXES = (".png", ".svg")
 SOURCE_SUFFIXES = (".drawio", ".xml")
+KNOWN_MACROS = frozenset(
+    {
+        "code",
+        "plantuml",
+        "plantumlcloud",
+        "drawio",
+        "draw.io",
+        "expand",
+        "status",
+        *CALLOUT_TYPE,
+    }
+)
 
 
 @dataclass(frozen=True)
@@ -62,6 +74,9 @@ class TransformResult:
 _CTX: contextvars.ContextVar[TransformContext] = contextvars.ContextVar(
     "transform_ctx", default=TransformContext()
 )
+_UNSUPPORTED: contextvars.ContextVar[list[str]] = contextvars.ContextVar(
+    "unsupported_macros", default=[]
+)
 
 
 def transform_storage(
@@ -69,7 +84,9 @@ def transform_storage(
     *,
     context: TransformContext | None = None,
 ) -> TransformResult:
+    unsupported: list[str] = []
     token = _CTX.set(context or TransformContext())
+    names_token = _UNSUPPORTED.set(unsupported)
     try:
         try:
             root = _parse(body_storage)
@@ -78,9 +95,10 @@ def transform_storage(
         text = _blocks(root).strip()
         if text:
             text += "\n"
-        return TransformResult(markdown=text)
+        return TransformResult(markdown=text, unsupported_macros=list(unsupported))
     finally:
         _CTX.reset(token)
+        _UNSUPPORTED.reset(names_token)
 
 
 def _ctx() -> TransformContext:
@@ -130,7 +148,7 @@ def _block(el: Element) -> str:
     if name == "blockquote":
         inner = _blocks(el).strip()
         return "\n".join(f"> {line}" if line else ">" for line in inner.split("\n"))
-    if name == "structured-macro":
+    if name in {"structured-macro", "macro"}:
         return _macro(el)
     if name == "task-list":
         return _task_list(el)
@@ -155,6 +173,7 @@ def _has_block_child(el: Element) -> bool:
         "hr",
         "blockquote",
         "structured-macro",
+        "macro",
         "task-list",
         *HEADINGS,
     }
@@ -194,7 +213,7 @@ def _inline_element(el: Element) -> str:
         return _emoticon(el)
     if name == "time":
         return _time(el)
-    if name == "structured-macro":
+    if name in {"structured-macro", "macro"}:
         return _macro(el)
     if name == "link":
         return _link(el)
@@ -413,10 +432,40 @@ def _macro(el: Element) -> str:
     if name == "status":
         text = params.get("title") or ""
         return f"`{text}`"
-    rich = _rich(el)
-    if rich is not None:
-        return _blocks(rich)
-    return _plain_body(el)
+    return _unknown_macro(el, name)
+
+
+def _unknown_macro(el: Element, name: str) -> str:
+    _record_unsupported(name)
+    for child in el.iter():
+        if child is el:
+            continue
+        if _local(child.tag) in {"structured-macro", "macro"}:
+            nested = _attr(child, "name")
+            if nested not in KNOWN_MACROS:
+                _record_unsupported(nested)
+    comment = f"<!-- unsupported-macro: {name} -->"
+    text = _extracted_text(el)
+    if text:
+        return f"{comment}\n{text}"
+    return comment
+
+
+def _record_unsupported(name: str) -> None:
+    if not name:
+        return
+    names = _UNSUPPORTED.get()
+    if name not in names:
+        names.append(name)
+
+
+def _extracted_text(el: Element) -> str:
+    chunks: list[str] = []
+    for child in el:
+        loc = _local(child.tag)
+        if loc in {"plain-text-body", "cdata-body", "rich-text-body"}:
+            chunks.extend(part.strip() for part in child.itertext() if part.strip())
+    return " ".join(chunks)
 
 
 def _params(el: Element) -> dict[str, str]:
