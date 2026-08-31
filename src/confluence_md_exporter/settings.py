@@ -18,6 +18,10 @@ class ConfigError(Exception):
     """Impossible start: configuration is not usable."""
 
 
+class AuthError(ConfigError):
+    """HTTP 401 on the first request to the instance; the process must not fetch pages."""
+
+
 @dataclass(frozen=True)
 class Settings:
     confluence_base_url: str

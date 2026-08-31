@@ -8,9 +8,11 @@ import os
 import sys
 from collections.abc import Callable, Mapping, Sequence
 
+from confluence_md_exporter.client import ConfluenceClient
 from confluence_md_exporter.settings import ConfigError, Settings, load_settings
 
 ExportFn = Callable[[Settings], None]
+AuthProbe = Callable[[Settings], None]
 
 
 def parse_cli(argv: Sequence[str] | None = None) -> argparse.Namespace:
@@ -33,11 +35,16 @@ def configure_logging(level: str) -> None:
     logging.basicConfig(level=getattr(logging, level), format="%(levelname)s %(message)s")
 
 
+def _default_auth_probe(settings: Settings) -> None:
+    ConfluenceClient(settings).probe()
+
+
 def main(
     argv: Sequence[str] | None = None,
     environ: Mapping[str, str] | None = None,
     *,
     run_export: ExportFn | None = None,
+    auth_probe: AuthProbe | None = None,
 ) -> int:
     try:
         args = parse_cli(argv)
@@ -52,6 +59,13 @@ def main(
         return 2
 
     configure_logging(settings.log_level)
+    probe = auth_probe if auth_probe is not None else _default_auth_probe
+    try:
+        probe(settings)
+    except ConfigError as exc:
+        print(str(exc), file=sys.stderr)
+        return 2
+
     if run_export is not None:
         run_export(settings)
     return 0

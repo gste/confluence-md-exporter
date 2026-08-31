@@ -61,6 +61,7 @@ def test_cli_input_output_force_refresh_override_env(tmp_path: Path) -> None:
         argv=["--input", str(other_input), "--output", other_output, "--force-refresh"],
         environ=env,
         run_export=run_export,
+        auth_probe=lambda _settings: None,
     )
     assert code == 0
     settings = captured["settings"]
