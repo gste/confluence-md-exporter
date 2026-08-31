@@ -19,7 +19,7 @@ class ConfigError(Exception):
 
 
 class AuthError(ConfigError):
-    """HTTP 401 on the first request to the instance; the process must not fetch pages."""
+    """Identity probe did not confirm the operator; the process must not fetch pages."""
 
 
 @dataclass(frozen=True)
