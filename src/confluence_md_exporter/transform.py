@@ -6,7 +6,7 @@ import contextvars
 import re
 import xml.etree.ElementTree as ET
 from dataclasses import dataclass, field
-from html import escape as html_escape
+from html import escape as html_escape, unescape
 from typing import Any, Mapping, Sequence
 from urllib.parse import quote
 from xml.etree.ElementTree import Element
@@ -42,6 +42,8 @@ KNOWN_MACROS = frozenset(
         *CALLOUT_TYPE,
     }
 )
+_XML_PREDEFINED_ENTITIES = frozenset({"lt", "gt", "amp", "apos", "quot"})
+_NAMED_ENTITY = re.compile(r"&([A-Za-z][A-Za-z0-9]+);")
 
 
 @dataclass(frozen=True)
@@ -106,9 +108,20 @@ def _ctx() -> TransformContext:
 
 
 def _parse(body: str) -> Element:
-    prepared = body.replace("&nbsp;", "&#160;")
+    prepared = _expand_html_named_entities(body)
     wrapped = f'<root xmlns:ac="{AC}" xmlns:ri="{RI}">{prepared}</root>'
     return ET.fromstring(wrapped)
+
+
+def _expand_html_named_entities(body: str) -> str:
+    def replace(match: re.Match[str]) -> str:
+        name = match.group(1)
+        if name in _XML_PREDEFINED_ENTITIES:
+            return match.group(0)
+        expanded = unescape(match.group(0))
+        return expanded if expanded != match.group(0) else match.group(0)
+
+    return _NAMED_ENTITY.sub(replace, body)
 
 
 def _local(tag: str) -> str:
