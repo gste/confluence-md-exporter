@@ -1,6 +1,6 @@
 # Workflow
 
-Сквозной процесс изменений для репозиториев, работающих по схеме:
+Сквозной процесс изменений **DeltaFuse** для репозиториев, работающих по схеме:
 
 ```text
 Init Requirements + ADR → Specification (docs/spec/) → Atomic tasks (docs/todo/) → Implementation

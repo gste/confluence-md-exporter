@@ -54,3 +54,7 @@ data/
 ├── 04_markdown/          # *.md и manifest.json
 └── run_report.json
 ```
+
+## Как ведём работу
+
+Поставка в этом репозитории идёт по **DeltaFuse** (`delta-fuse`): [`docs/process/using.md`](docs/process/using.md). Этот файл — запуск экспортёра, не гайд фреймворка.

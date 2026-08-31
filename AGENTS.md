@@ -1,8 +1,8 @@
 # AGENTS.md
 
-Standing orders for any AI agent working in this repository.
+Standing orders for any AI agent working in a **DeltaFuse** repository (`delta-fuse`: this file + `docs/process/`).
 
-This file is **process-only**. Product behaviour lives exclusively under `docs/spec/` (the Specification / SDD pack), derived from Init Requirements and accepted ADRs.
+This file is **process-only**. Product behaviour lives exclusively under `docs/spec/` (the Specification / SDD pack), derived from Init Requirements and accepted ADRs. How to adopt the framework: `docs/process/using.md`.
 
 ## Source of truth chain
 
@@ -17,7 +17,7 @@ Init Requirements + Architecture Decisions (ADR)
 |-------------------------|-----------------------------------------------------------|
 | What to implement       | `docs/spec/**` only                                       |
 | Why a decision was made | `docs/decisions/**`                                       |
-| How we work             | `docs/process/**` + this file                             |
+| How we work             | DeltaFuse: `docs/process/**` + this file                  |
 | Current epic tasks      | `docs/todo/<epic>/` (if present)                          |
 | Init Requirements       | `docs/init/` (pre-accept) or `docs/archive/` (historical) |
 
