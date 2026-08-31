@@ -145,11 +145,18 @@ def _int(environ: Mapping[str, str], key: str, *, default: int, minimum: int) ->
 
 
 def _normalize_base_url(raw: str) -> str:
-    parsed = urlparse(raw)
+    parsed = urlparse(raw.strip())
     if parsed.scheme not in {"http", "https"} or not parsed.hostname:
-        raise ConfigError("CONFLUENCE_BASE_URL must be an origin (scheme + host + optional port)")
-    if parsed.path not in {"",} or parsed.params or parsed.query or parsed.fragment:
-        raise ConfigError("CONFLUENCE_BASE_URL must not include a path, query, or fragment")
+        raise ConfigError(
+            "CONFLUENCE_BASE_URL must be a URL (scheme + host + optional port and context path)"
+        )
+    if parsed.params or parsed.query or parsed.fragment:
+        raise ConfigError("CONFLUENCE_BASE_URL must not include a query or fragment")
     if parsed.username or parsed.password:
         raise ConfigError("CONFLUENCE_BASE_URL must not include credentials")
-    return f"{parsed.scheme}://{parsed.netloc}"
+    path = parsed.path or ""
+    if path.endswith("/"):
+        path = path.rstrip("/")
+    if "wiki" in {segment for segment in path.split("/") if segment}:
+        raise ConfigError("CONFLUENCE_BASE_URL must not include /wiki")
+    return f"{parsed.scheme}://{parsed.netloc}{path}"

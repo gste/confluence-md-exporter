@@ -20,7 +20,7 @@ uv run --env-file .env confluence-md-exporter
 
 Обязательно:
 
-- `CONFLUENCE_BASE_URL` — origin (схема + хост, без пути `/wiki`, без хвостового `/`)
+- `CONFLUENCE_BASE_URL` — база приложения: origin и опциональный контекст-путь, без `/wiki` и без хвостового `/`. Пример: `https://confluence.example.com/confluence`
 - `CONFLUENCE_AUTH_TYPE` — `bearer` или `basic`
 - `CONFLUENCE_TOKEN` — PAT или пароль
 

@@ -141,3 +141,35 @@ def test_missing_file_is_impossible_start(tmp_path: Path) -> None:
     missing = tmp_path / "nope.txt"
     with pytest.raises(ConfigError, match="does not exist"):
         resolve_input_file(missing, BASE)
+
+
+CONTEXT = "https://confluence.example.com/confluence"
+
+
+def test_context_path_viewpage_is_accepted(tmp_path: Path) -> None:
+    path = _write(tmp_path, f"{CONTEXT}/pages/viewpage.action?pageId=201\n")
+    result = resolve_input_file(path, CONTEXT)
+    assert result.pages_total == 1
+    assert result.entries[0].page_id == "201"
+    assert result.invalid_urls == ()
+
+
+def test_origin_without_context_path_is_invalid(tmp_path: Path) -> None:
+    path = _write(tmp_path, f"{BASE}/pages/viewpage.action?pageId=202\n")
+    result = resolve_input_file(path, CONTEXT)
+    assert result.pages_total == 0
+    assert result.invalid_urls == (f"{BASE}/pages/viewpage.action?pageId=202",)
+
+
+def test_context_path_relative_from_origin(tmp_path: Path) -> None:
+    path = _write(tmp_path, "/confluence/pages/viewpage.action?pageId=203\n")
+    result = resolve_input_file(path, CONTEXT)
+    assert result.pages_total == 1
+    assert result.entries[0].page_id == "203"
+
+
+def test_root_relative_rejected_when_base_has_context(tmp_path: Path) -> None:
+    path = _write(tmp_path, "/pages/viewpage.action?pageId=204\n")
+    result = resolve_input_file(path, CONTEXT)
+    assert result.pages_total == 0
+    assert len(result.invalid_urls) == 1
