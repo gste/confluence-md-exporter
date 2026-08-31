@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+from html import unescape
 from pathlib import Path
 from typing import Any, Mapping, Sequence
 
@@ -128,6 +129,10 @@ def write_gold_markdown(
     _require_keys(data, FRONTMATTER_KEYS)
     if data["id"] != page_id:
         raise ValueError("frontmatter id must match page_id")
+    data["title"] = unescape(str(data["title"]))
+    crumbs = data.get("breadcrumbs")
+    if isinstance(crumbs, list):
+        data["breadcrumbs"] = [unescape(str(item)) for item in crumbs]
     slug = slugify(str(data["title"]))
     path = output_dir / gold_markdown_path(page_id, slug)
     path.parent.mkdir(parents=True, exist_ok=True)
