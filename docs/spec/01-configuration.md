@@ -11,7 +11,7 @@
 
 ## Instance
 
-`CONFLUENCE_BASE_URL` — origin инстанса Server/Data Center: схема + хост + опционально порт, без пути `/wiki` и без завершающего `/`.
+`CONFLUENCE_BASE_URL` — база приложения Server/Data Center: схема + хост + опционально порт + опционально контекст-путь, без завершающего `/`. Путь `/wiki` и путь, содержащий `/wiki`, запрещены (маркер Cloud). Пример: `https://host/confluence`. Монтирование в корне origin (путь пуст) допустимо.
 
 `CONFLUENCE_EDITION` по умолчанию `datacenter`. Единственное допустимое значение — `datacenter`. Любое другое значение, включая `cloud`, — невозможный старт, код выхода `2`.
 
@@ -34,7 +34,7 @@
 
 | Ключ | Обязательность | Смысл |
 |---|---|---|
-| `CONFLUENCE_BASE_URL` | да | origin инстанса |
+| `CONFLUENCE_BASE_URL` | да | база приложения: origin и опциональный контекст-путь |
 | `CONFLUENCE_EDITION` | нет, default `datacenter` | только `datacenter` |
 | `CONFLUENCE_AUTH_TYPE` | да | `basic` \| `bearer` |
 | `CONFLUENCE_TOKEN` | да | PAT или password |
