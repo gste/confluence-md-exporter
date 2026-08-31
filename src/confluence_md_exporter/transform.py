@@ -2,11 +2,17 @@
 
 from __future__ import annotations
 
+import contextvars
 import re
 import xml.etree.ElementTree as ET
 from dataclasses import dataclass, field
 from html import escape as html_escape
+from typing import Any, Mapping, Sequence
+from urllib.parse import quote
 from xml.etree.ElementTree import Element
+
+from confluence_md_exporter.assets import missing_attachment_placeholder
+from confluence_md_exporter.layout import asset_relative_path, slugify
 
 AC = "http://www.atlassian.com/schema/confluence/4/ac/"
 RI = "http://www.atlassian.com/schema/confluence/4/ri/"
@@ -22,6 +28,24 @@ CALLOUT_TYPE = {
 }
 
 HEADINGS = {f"h{i}": i for i in range(1, 7)}
+PREVIEW_SUFFIXES = (".png", ".svg")
+SOURCE_SUFFIXES = (".drawio", ".xml")
+
+
+@dataclass(frozen=True)
+class BatchPage:
+    page_id: str
+    title: str
+    space_key: str = ""
+
+
+@dataclass
+class TransformContext:
+    page_id: str = ""
+    original_to_safe: Mapping[str, str] = field(default_factory=dict)
+    attachments: Sequence[Mapping[str, Any]] = field(default_factory=tuple)
+    batch_pages: Sequence[BatchPage] = field(default_factory=tuple)
+    base_url: str = ""
 
 
 @dataclass
@@ -35,15 +59,32 @@ class TransformResult:
         return self.error is not None
 
 
-def transform_storage(body_storage: str) -> TransformResult:
+_CTX: contextvars.ContextVar[TransformContext] = contextvars.ContextVar(
+    "transform_ctx", default=TransformContext()
+)
+
+
+def transform_storage(
+    body_storage: str,
+    *,
+    context: TransformContext | None = None,
+) -> TransformResult:
+    token = _CTX.set(context or TransformContext())
     try:
-        root = _parse(body_storage)
-    except ET.ParseError:
-        return TransformResult(markdown="", error="invalid_xml")
-    text = _blocks(root).strip()
-    if text:
-        text += "\n"
-    return TransformResult(markdown=text)
+        try:
+            root = _parse(body_storage)
+        except ET.ParseError:
+            return TransformResult(markdown="", error="invalid_xml")
+        text = _blocks(root).strip()
+        if text:
+            text += "\n"
+        return TransformResult(markdown=text)
+    finally:
+        _CTX.reset(token)
+
+
+def _ctx() -> TransformContext:
+    return _CTX.get()
 
 
 def _parse(body: str) -> Element:
@@ -93,7 +134,7 @@ def _block(el: Element) -> str:
         return _macro(el)
     if name == "task-list":
         return _task_list(el)
-    if name in {"emoticon", "time", "link", "user"}:
+    if name in {"emoticon", "time", "link", "user", "image"}:
         return _inline_element(el)
     if name in {"div", "span", "tbody", "thead", "tfoot"}:
         return _blocks(el) if _has_block_child(el) else _inline(el).strip()
@@ -147,6 +188,8 @@ def _inline_element(el: Element) -> str:
         text = _inline(el).strip()
         href = el.get("href") or ""
         return f"[{text}]({href})"
+    if name == "image":
+        return _image(el)
     if name == "emoticon":
         return _emoticon(el)
     if name == "time":
@@ -154,10 +197,7 @@ def _inline_element(el: Element) -> str:
     if name == "structured-macro":
         return _macro(el)
     if name == "link":
-        user = _find_named(el, "user")
-        if user is not None:
-            return _user(el, user)
-        return _inline(el)
+        return _link(el)
     if name == "user":
         return _user(el, el)
     return _inline(el)
@@ -195,6 +235,150 @@ def _user(container: Element, user: Element) -> str:
     return "@"
 
 
+def _link(el: Element) -> str:
+    user = _find_named(el, "user")
+    if user is not None:
+        return _user(el, user)
+    attachment = _find_named(el, "attachment")
+    if attachment is not None:
+        original = _attr(attachment, "filename")
+        text = _link_body(el) or original
+        return _attachment_markdown(original, text=text, image=False)
+    page = _find_named(el, "page")
+    if page is not None:
+        return _page_link(el, page)
+    return _inline(el)
+
+
+def _image(el: Element) -> str:
+    alt = _attr(el, "alt") or _attr(el, "title") or ""
+    url_el = _find_named(el, "url")
+    if url_el is not None:
+        href = _attr(url_el, "value") or url_el.get("value") or ""
+        return f"![{alt}]({href})"
+    attachment = _find_named(el, "attachment")
+    if attachment is None:
+        return ""
+    original = _attr(attachment, "filename")
+    return _attachment_markdown(original, text=alt or original, image=True)
+
+
+def _attachment_markdown(original: str, *, text: str, image: bool) -> str:
+    href = _asset_href(original)
+    if href is None:
+        return missing_attachment_placeholder(original)
+    label = text or original
+    if image:
+        return f"![{label}]({href})"
+    return f"[{label}]({href})"
+
+
+def _asset_href(original: str) -> str | None:
+    ctx = _ctx()
+    safe = ctx.original_to_safe.get(original)
+    if not safe or not ctx.page_id:
+        return None
+    return asset_relative_path(ctx.page_id, safe)
+
+
+def _attachment_originals() -> list[str]:
+    ctx = _ctx()
+    titles = [str(item.get("title") or "") for item in ctx.attachments if item.get("title")]
+    if titles:
+        return titles
+    return list(ctx.original_to_safe.keys())
+
+
+def _lookup_original(name: str, originals: Sequence[str]) -> str | None:
+    for original in originals:
+        if original.lower() == name.lower():
+            return original
+    return None
+
+
+def _drawio(params: Mapping[str, str]) -> str:
+    diagram = params.get("diagramName") or params.get("name") or params.get("diagram") or ""
+    originals = _attachment_originals()
+    preview = _pick_drawio_preview(diagram, originals)
+    source = _pick_drawio_source(diagram, originals)
+    parts: list[str] = []
+    if preview:
+        parts.append(_attachment_markdown(preview, text=diagram or preview, image=True))
+    if source:
+        href = _asset_href(source)
+        if href is None:
+            parts.append(missing_attachment_placeholder(source))
+        else:
+            parts.append(f"[source]({href})")
+    if parts:
+        return " ".join(parts)
+    return missing_attachment_placeholder(diagram or "drawio")
+
+
+def _pick_drawio_preview(diagram: str, originals: Sequence[str]) -> str | None:
+    candidates = [f"{diagram}{suffix}" for suffix in PREVIEW_SUFFIXES]
+    candidates.extend(f"{diagram}.drawio{suffix}" for suffix in PREVIEW_SUFFIXES)
+    for name in candidates:
+        found = _lookup_original(name, originals)
+        if found:
+            return found
+    needle = diagram.lower()
+    for original in originals:
+        lower = original.lower()
+        if lower.endswith(PREVIEW_SUFFIXES) and needle and needle in lower:
+            return original
+    return None
+
+
+def _pick_drawio_source(diagram: str, originals: Sequence[str]) -> str | None:
+    needle = diagram.lower()
+    for original in originals:
+        lower = original.lower()
+        if not lower.endswith(SOURCE_SUFFIXES):
+            continue
+        if needle and needle in lower:
+            return original
+        if not needle:
+            return original
+    return None
+
+
+def _page_link(link_el: Element, page_el: Element) -> str:
+    ctx = _ctx()
+    title = _attr(page_el, "content-title") or _attr(page_el, "contentTitle")
+    space = _attr(page_el, "space-key") or _attr(page_el, "spaceKey")
+    target_id = _attr(page_el, "content-id") or _attr(page_el, "contentId")
+    anchor = _attr(link_el, "anchor")
+    fragment = f"#{anchor}" if anchor else ""
+    text = _link_body(link_el) or title or target_id
+    matched = _resolve_batch_page(ctx, target_id, space, title)
+    if matched is not None:
+        href = f"{matched.page_id}_{slugify(matched.title)}.md{fragment}"
+        return f"[{text}]({href})"
+    base = ctx.base_url.rstrip("/")
+    if target_id:
+        href = f"{base}/pages/viewpage.action?pageId={target_id}{fragment}"
+    else:
+        encoded = quote(title, safe="")
+        href = f"{base}/display/{space}/{encoded}{fragment}"
+    return f"[{text}]({href})"
+
+
+def _resolve_batch_page(
+    ctx: TransformContext,
+    target_id: str,
+    space: str,
+    title: str,
+) -> BatchPage | None:
+    by_id = {page.page_id: page for page in ctx.batch_pages}
+    if target_id and target_id in by_id:
+        return by_id[target_id]
+    for page in ctx.batch_pages:
+        if title and page.title == title and (not space or page.space_key == space):
+            return page
+    return None
+
+
 def _link_body(el: Element) -> str:
     for child in el:
         if _local(child.tag) in {"plain-text-link-body", "link-body"}:
@@ -217,6 +401,8 @@ def _macro(el: Element) -> str:
         return _fenced(_plain_body(el), lang)
     if name in {"plantuml", "plantumlcloud"}:
         return _fenced(_plain_body(el), "plantuml")
+    if name in {"drawio", "draw.io"}:
+        return _drawio(params)
     if name in CALLOUT_TYPE:
         return _callout(CALLOUT_TYPE[name], _rich_md(el))
     if name == "expand":
