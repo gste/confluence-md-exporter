@@ -65,6 +65,22 @@ class ConfluenceClient:
         if response.status == 401:
             raise AuthError("authentication failed")
 
+    def fetch_version(self, page_id: str) -> int | None:
+        query = urllib.parse.urlencode({"expand": "version"})
+        response = self._request(self._url(f"/rest/api/content/{page_id}?{query}"))
+        if response.status >= 400:
+            return None
+        payload = response.json()
+        if not isinstance(payload, dict):
+            return None
+        number = (payload.get("version") or {}).get("number")
+        if number is None:
+            return None
+        try:
+            return int(number)
+        except (TypeError, ValueError):
+            return None
+
     def fetch_entry(self, entry: AcceptedEntry) -> PageFetchResult:
         try:
             if entry.needs_title_lookup:
