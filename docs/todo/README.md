@@ -8,6 +8,8 @@
 
 ## Open
 
+- [live-run-bugs](./live-run-bugs/)
+
 ## Closed
 
 | NN | kind | slug | epic | closed |
