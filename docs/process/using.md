@@ -45,7 +45,7 @@ DeltaFuse — фреймворк работы через спецификаци�
 
 | Вызов | Когда |
 |-------|--------|
-| `/init-requirements` | нет замысла в `docs/init/` |
+| `/init-requirements` | нет замысла в `docs/init/`; если файлы уже есть — стоп, A/B/C в работе 01 |
 | `/init-to-spec` | `bootstrap`, Init есть, пакета спеки нет |
 | `/spec-to-epic` | `spec-first`, нет файла под работу |
 | `/implement-task` | файл в `docs/todo/<epic>/task/` |

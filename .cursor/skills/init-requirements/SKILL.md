@@ -1,6 +1,6 @@
 ---
 name: init-requirements
-description: Captures product intent as Init Requirements under docs/init/ before any specification exists. Use at repository bootstrap when the product is not described yet, or when the human wants to restate goals, scope, and constraints before the spec pack is assembled.
+description: Captures product intent as Init Requirements under docs/init/ before any specification exists. Use at repository bootstrap when the product is not described yet. If docs/init already has files, follow the existing-init fork in the job prompt before writing.
 disable-model-invocation: true
 ---
 
