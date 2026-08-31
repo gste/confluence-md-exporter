@@ -4,7 +4,9 @@
 
 Исправления после живого прогона `uv run --env-file .env confluence-md-exporter` против DC с контекст-путём `/confluence`. Цель: оператор видит, почему вход отклонён и почему старт «зелёный», а страниц нет.
 
-## Evidence (прогон)
+## Run
+
+`opened` эпика: `2026-08-31`. Команда: `uv run --env-file .env confluence-md-exporter`.
 
 - CLI завершился кодом `0`, Prefect: `Completed()`, в stdout не было предупреждений по строкам входа.
 - `run_report.json`: `pages_total` 0; `invalid_urls` — четыре исходные строки `/confluence/x/<hash>` без причины.
@@ -38,11 +40,11 @@ Tiny-link как успешный резолв — не баг: он в [out of 
 
 ## Tasks
 
-| # | Файл | Kind | Тип | Зависит от |
-|---|---|---|---|---|
-| 01 | [01-bug-invalid-url-reasons.md](./01-bug-invalid-url-reasons.md) | `bug` | `spec-patch` | — |
-| 02 | [02-bug-auth-probe-non-success.md](./02-bug-auth-probe-non-success.md) | `bug` | `spec-patch` | — |
-| 03 | [03-bug-context-path.md](./03-bug-context-path.md) | `bug` | `adr+spec` | принятый [ADR 0001](../../decisions/0001-dc-context-path.md) |
+| # | Файл | Kind | Opened | Тип | Зависит от |
+|---|---|---|---|---|---|
+| 01 | [01-bug-invalid-url-reasons.md](./01-bug-invalid-url-reasons.md) | `bug` | `2026-08-31` | `spec-patch` | — |
+| 02 | [02-bug-auth-probe-non-success.md](./02-bug-auth-probe-non-success.md) | `bug` | `2026-08-31` | `spec-patch` | — |
+| 03 | [03-bug-context-path.md](./03-bug-context-path.md) | `bug` | `2026-08-31` | `adr+spec` | принятый [ADR 0001](../../decisions/0001-dc-context-path.md) |
 
 01 и 02 независимы. 03 не реализовывать, пока человек не выставит ADR `status: accepted` и не будет смержена зеркальная правка спеки.
 
