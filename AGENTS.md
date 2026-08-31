@@ -26,7 +26,7 @@ Rules:
 - **Implementation law** = `docs/spec/`. If code and spec disagree, spec wins; open a `spec-patch`, do not “fix in code only”.
 - **ADR does not replace spec.** An accepted ADR must be reflected as imperative text in `docs/spec/` in the same change set.
 - **Init Requirements do not replace spec.** After the Specification pack is accepted, do not implement from Init or archive.
-- Task files under `docs/todo/` are an inbox (links + DoD only), not a second specification. Each file is `kind: feature` or `kind: bug`; implementation branches are `feature/<slug>` or `bugfix/<slug>`. A `bug` file carries `opened` (YYYY-MM-DD) and may include a `Run` note without secrets.
+- Task files under `docs/todo/` are an inbox (links + DoD only), not a second specification. Layout: `docs/todo/<epic>/task/` (`kind: task`, branch `feature/<slug>`) and `docs/todo/<epic>/bug/` (`kind: bug`, branch `bugfix/<slug>`). A `bug` file carries `opened` (YYYY-MM-DD) and may include a `Run` note without secrets. Implement `task/` with `/implement-task`; take a bug with `/fix-bug`. The implementing PR deletes the closed file; an empty epic directory is removed.
 - User-facing chat follows the Language table in `docs/process/README.md` (Russian), even though this file is English. Exception: the human wrote this turn in English.
 
 ## Default reading order
@@ -37,7 +37,7 @@ Rules:
 2. `docs/process/workflow.md`
 3. `docs/process/roles.md`
 4. `docs/spec/README.md` → only sections linked from the current task
-5. Task file under `docs/todo/<epic>/` if provided
+5. Task file under `docs/todo/<epic>/task/` or `docs/todo/<epic>/bug/` if provided
 
 **Planner / auditor agent**
 
@@ -85,6 +85,8 @@ Details: `docs/process/roles.md`.
 
 ## How to implement a task
 
+`/implement-task` is only for `docs/todo/<epic>/task/`. A bug is `/fix-bug`.
+
 1. Read the task file — including its Spec delta — and **linked** spec sections only. A branch diff replaces neither.
 2. Implement the smallest change that satisfies DoD.
 3. Add or adjust tests required by the task or by the testing section of the Specification.
@@ -96,7 +98,8 @@ Details: `docs/process/roles.md`.
 ## PR expectations
 
 - Prefer one task ≈ one PR.
+- The implementing PR deletes the closed inbox file (`task/` or `bug/`) and its README row; delete `docs/todo/<epic>/` if nothing remains.
 - No drive-by refactors outside task scope.
 - Behaviour change ⇒ spec updated in the same PR or an already-merged prior PR.
 - `docs/spec/**` changed ⇒ PR body carries the Spec delta (`ADDED` / `MODIFIED` / `REMOVED` + anchors) and the diff stays inside it.
-- After the last task of an epic: clear `docs/todo/<epic>/`.
+- After the last remaining slice of an epic: delete `docs/todo/<epic>/`. Each implementing PR already deletes its own inbox file.
