@@ -38,11 +38,11 @@ Tiny-link как успешный резолв — не баг: он в [out of 
 
 ## Tasks
 
-| # | Файл | Тип | Зависит от |
-|---|---|---|---|
-| 01 | [01-invalid-url-reasons.md](./01-invalid-url-reasons.md) | `spec-patch` | — |
-| 02 | [02-auth-probe-non-success.md](./02-auth-probe-non-success.md) | `spec-patch` | — |
-| 03 | [03-context-path.md](./03-context-path.md) | `adr+spec` | принятый [ADR 0001](../../decisions/0001-dc-context-path.md) |
+| # | Файл | Kind | Тип | Зависит от |
+|---|---|---|---|---|
+| 01 | [01-bug-invalid-url-reasons.md](./01-bug-invalid-url-reasons.md) | `bug` | `spec-patch` | — |
+| 02 | [02-bug-auth-probe-non-success.md](./02-bug-auth-probe-non-success.md) | `bug` | `spec-patch` | — |
+| 03 | [03-bug-context-path.md](./03-bug-context-path.md) | `bug` | `adr+spec` | принятый [ADR 0001](../../decisions/0001-dc-context-path.md) |
 
 01 и 02 независимы. 03 не реализовывать, пока человек не выставит ADR `status: accepted` и не будет смержена зеркальная правка спеки.
 

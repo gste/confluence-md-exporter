@@ -1,5 +1,9 @@
 # 01 — Explicit invalid URL reasons
 
+## Kind
+
+`bug`
+
 ## Goal
 
 Каждая отклонённая строка входа классифицируется кодом причины. Причина пишется явно: WARNING в лог (строка + код), элемент `invalid_urls` в `run_report.json`, перечень в сводке Prefect. Tiny-link остаётся невалидным.
