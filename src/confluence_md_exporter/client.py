@@ -1,4 +1,4 @@
-"""Synchronous Confluence Server/DC REST client. Read-only; no attachment binaries."""
+"""Synchronous Confluence Server/DC REST client. Read-only GET, including attachment bytes."""
 
 from __future__ import annotations
 
@@ -144,8 +144,8 @@ class ConfluenceClient:
             url = self._absolute(next_link) if next_link else ""
         return items
 
-    def _request(self, url: str) -> HttpResponse:
-        headers = self._headers()
+    def _request(self, url: str, *, accept: str = "application/json") -> HttpResponse:
+        headers = self._headers(accept=accept)
         attempts = 1 + self._settings.confluence_max_retries
         last: HttpResponse | None = None
         for attempt in range(attempts):
@@ -156,14 +156,24 @@ class ConfluenceClient:
         assert last is not None
         return last
 
-    def _headers(self) -> dict[str, str]:
+    def attachment_download_url(self, attachment: Mapping[str, Any]) -> str:
+        given = str(attachment.get("download_path") or "")
+        if given and "/download/attachments/" not in given and "/rest/api/" in given:
+            return self._absolute(given)
+        attachment_id = str(attachment.get("id") or "")
+        return self._url(f"/rest/api/content/{attachment_id}")
+
+    def download(self, url: str) -> HttpResponse:
+        return self._request(url, accept="*/*")
+
+    def _headers(self, *, accept: str = "application/json") -> dict[str, str]:
         settings = self._settings
         if settings.confluence_auth_type == "bearer":
             authorization = f"Bearer {settings.confluence_token}"
         else:
             raw = f"{settings.confluence_username}:{settings.confluence_token}".encode("utf-8")
             authorization = f"Basic {base64.b64encode(raw).decode('ascii')}"
-        return {"Authorization": authorization, "Accept": "application/json"}
+        return {"Authorization": authorization, "Accept": accept}
 
     def _url(self, path: str) -> str:
         return self._settings.confluence_base_url + path
