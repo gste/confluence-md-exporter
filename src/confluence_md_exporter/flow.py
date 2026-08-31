@@ -80,6 +80,7 @@ def run_export(
     ok = sum(1 for item in outcomes if item.status == "ok")
     failed = sum(1 for item in outcomes if item.status == "failed")
     skipped = sum(1 for item in outcomes if item.status == "skipped")
+    invalid_urls = [item.as_report() for item in resolved.invalid_urls]
     write_run_report(
         output_dir,
         {
@@ -89,13 +90,13 @@ def run_export(
             "ok": ok,
             "failed": failed,
             "skipped": skipped,
-            "invalid_urls": list(resolved.invalid_urls),
+            "invalid_urls": invalid_urls,
             "force_refresh": settings.export_force_refresh,
             "errors": errors,
         },
     )
     publisher(
-        markdown=_summary_markdown(ok, failed, skipped, list(resolved.invalid_urls), settings.export_force_refresh, errors),
+        markdown=_summary_markdown(ok, failed, skipped, invalid_urls, settings.export_force_refresh, errors),
         key="run-summary",
         description="Export run summary",
     )
@@ -349,7 +350,7 @@ def _summary_markdown(
     ok: int,
     failed: int,
     skipped: int,
-    invalid_urls: Sequence[str],
+    invalid_urls: Sequence[Mapping[str, str]],
     force_refresh: bool,
     errors: Sequence[Mapping[str, Any]],
 ) -> str:
@@ -362,8 +363,14 @@ def _summary_markdown(
         f"- invalid_urls: {len(invalid_urls)}",
         f"- force_refresh: {force_refresh}",
         "",
-        "## Errors",
+        "## Invalid URLs",
     ]
+    if not invalid_urls:
+        lines.append("none")
+    else:
+        for item in invalid_urls:
+            lines.append(f"- {item.get('url')}: {item.get('reason')}")
+    lines.extend(["", "## Errors"])
     if not errors:
         lines.append("none")
     else:
