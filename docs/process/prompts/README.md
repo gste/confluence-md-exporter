@@ -20,7 +20,7 @@ Job-промпт никогда не пересказывает ядро и пр
 
 | #  | Файл                                                   | Роль                      | Выпускает             | Когда применяется                                                              |
 |----|--------------------------------------------------------|---------------------------|-----------------------|--------------------------------------------------------------------------------|
-| 01 | [`01-init-requirements.md`](./01-init-requirements.md) | Init author (draft)       | `docs/init/**`        | замысел продукта ещё не зафиксирован                                           |
+| 01 | [`01-init-requirements.md`](./01-init-requirements.md) | Init author (draft)       | `docs/init/**`        | замысел ещё не зафиксирован; непустой `docs/init/` — стоп и A/B/C               |
 | 02 | [`02-init-to-spec.md`](./02-init-to-spec.md)           | Spec editor (draft)       | пакет `docs/spec/**`  | `stage: bootstrap`, Init заполнен, пакета нет или он неполон                   |
 | 03 | [`03-spec-to-epic.md`](./03-spec-to-epic.md)           | Planner                   | `docs/todo/<epic>/**` | `stage: spec-first`, файла под нужную работу нет                               |
 | 04 | [`04-implement-task.md`](./04-implement-task.md)       | Implementer               | код, тесты, PR        | `stage: spec-first`, файл в `docs/todo/<epic>/task/`                           |
