@@ -22,7 +22,7 @@ Init Requirements + Architecture Decisions (ADR)
 3. **После приёмки SDD-пакета Init Requirements историчны.**  
    Держим их в `docs/init/` только до приёмки, затем переносим в `docs/archive/` (или считаем необязывающими).
 4. **`docs/todo/` — входящая очередь, а не вторая спека.**  
-   Задачи ссылаются на секции спеки и несут DoD; после выполнения удаляются.
+   Живые слайсы ссылаются на секции спеки и несут DoD. Закрытые — одна строка в таблице Closed корневого [`docs/todo/README.md`](../todo/README.md). Тела задач после закрытия не хранятся.
 5. **Никаких доменных требований в `docs/process/`.**  
    Доменный закон живёт только в `docs/spec/`.
 6. **Живая спека, дельта снаружи.**  
@@ -34,6 +34,8 @@ Init Requirements + Architecture Decisions (ADR)
 |------------------------------------------------------------------------------------------------------------------------------|------------|-----------------------------------------------------------------------|
 | Проза `docs/process/**`, `docs/spec/**`, `docs/init/**`, `docs/todo/**`                                                      | русский    | это держит в голове RU-команда                                        |
 | Корневой `README.md`                                                                                                         | русский    | how-to оператора; не спецификация                                     |
+| Корневой `CHANGELOG.md`                                                                                                      | русский    | формат банка; агент пишет только пункт в Unreleased                   |
+| Сообщения git                                                                                                                | английский | история репозитория                                                   |
 | Ответы человеку в чате                                                                                                       | русский    | та же аудитория, что у спеки; исключение — реплика человека на EN     |
 | `AGENTS.md`, `.cursor/skills/**`                                                                                             | английский | читают в основном агенты                                              |
 | Заголовки, якоря, имена файлов, requirement ID, идентификаторы кода                                                          | английский | стабильные ссылки, grep, перекрёстные ссылки не ломаются при переводе |
@@ -50,14 +52,14 @@ Init Requirements + Architecture Decisions (ADR)
 | Init Requirements     | `docs/init/`      | что мы собирались построить (до SDD) | только структура |
 | Архитектурные решения | `docs/decisions/` | почему выбрали вариант A             | только структура |
 | Спецификация (SDD)    | `docs/spec/`      | что именно мы строим                 | только структура |
-| Активные задачи       | `docs/todo/`      | текущие слайсы                       | только структура |
+| Активные задачи       | `docs/todo/`      | живые слайсы + Closed                | только структура |
 | Архив                 | `docs/archive/`   | вытесненный init, старые спеки       | только структура |
 
 ## Process files in this folder
 
 | Файл                                       | Назначение                                                   |
 |--------------------------------------------|--------------------------------------------------------------|
-| [`workflow.md`](./workflow.md)             | типы изменений, конвейер, правила эпиков и задач             |
+| [`workflow.md`](./workflow.md)             | типы изменений, конвейер, inbox, коммиты агента, CHANGELOG |
 | [`roles.md`](./roles.md)                   | полномочия человека и агента, гейты                          |
 | [`agent-prompt.md`](./agent-prompt.md)     | ядро сессии: инварианты и маршрутизация к job-промпту        |
 | [`STATUS.md`](./STATUS.md)                 | текущая стадия жизненного цикла (`bootstrap` / `spec-first`) |
@@ -67,7 +69,7 @@ Init Requirements + Architecture Decisions (ADR)
 ## Using this pack in a new repository
 
 1. Скопировать `AGENTS.md` и `docs/process/` как есть; заменить repo-local addendum в `agent-prompt.md`.
-2. Создать пустые `docs/init/`, `docs/decisions/`, `docs/spec/`, `docs/todo/`, `docs/archive/`.
+2. Создать пустые `docs/init/`, `docs/decisions/`, `docs/spec/`, `docs/todo/`, `docs/archive/`. В `docs/todo/README.md` — Open и пустая таблица Closed.
 3. Выставить `stage: bootstrap` в `STATUS.md`.
 4. Написать Init Requirements → при необходимости ADR → SDD-пакет под `docs/spec/`.
 5. После приёмки человеком переключить `STATUS.md` на `spec-first` и вести поставку только через `workflow.md`.
@@ -82,4 +84,4 @@ Init Requirements + Architecture Decisions (ADR)
 | агент, начинает сессию     | `agent-prompt.md` (core prompt) → job-промпт из таблицы маршрутизации |
 | агент, реализует `task`    | `AGENTS.md` → файл в `docs/todo/<epic>/task/` → связанные секции спеки |
 | агент, исправляет баг      | `AGENTS.md` → файл в `docs/todo/<epic>/bug/` → связанные секции спеки |
-| агент, планирует эпик      | `workflow.md` (раздел epic) + `docs/spec/README.md`                   |
+| агент, планирует эпик      | `workflow.md` (раздел epic) + `docs/todo/README.md` + `docs/spec/README.md` |
