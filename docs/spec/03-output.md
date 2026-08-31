@@ -110,7 +110,7 @@ data/
 | `ok` | число страниц `ok` |
 | `failed` | число страниц `failed` |
 | `skipped` | число страниц `skipped` |
-| `invalid_urls` | массив исходных невалидных строк |
+| `invalid_urls` | массив объектов `{ "url", "reason" }`: исходная отклонённая строка и код причины из [02-input.md#rejection-reasons](./02-input.md#rejection-reasons) |
 | `force_refresh` | значение флага этого запуска |
 | `errors` | массив `{ "page_id", "error" }` по страницам `failed` (и `skipped` с причиной, если причина есть); `page_id` допускается `null` |
 
