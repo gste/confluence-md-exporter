@@ -77,6 +77,29 @@ def test_cli_input_output_force_refresh_override_env(tmp_path: Path) -> None:
     assert settings.export_force_refresh is True
 
 
+def test_cli_short_flags_override_env(tmp_path: Path) -> None:
+    other_input = tmp_path / "short_input.txt"
+    other_input.write_text("", encoding="utf-8")
+    other_output = str(tmp_path / "short_out")
+    env = _env(tmp_path, EXPORT_FORCE_REFRESH="false")
+    captured: dict[str, Settings] = {}
+
+    def run_export(settings: Settings) -> None:
+        captured["settings"] = settings
+
+    code = main(
+        argv=["-i", str(other_input), "-o", other_output, "-r"],
+        environ=env,
+        run_export=run_export,
+        auth_probe=lambda _settings: None,
+    )
+    assert code == 0
+    settings = captured["settings"]
+    assert settings.export_input_file == str(other_input)
+    assert settings.export_output_dir == other_output
+    assert settings.export_force_refresh is True
+
+
 def test_verify_ssl_unrecognised_rejected(tmp_path: Path) -> None:
     with pytest.raises(ConfigError, match="CONFLUENCE_VERIFY_SSL"):
         load_settings(_env(tmp_path, CONFLUENCE_VERIFY_SSL="maybe"))

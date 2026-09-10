@@ -45,7 +45,7 @@ data/                                  # EXPORT_OUTPUT_DIR, default "data"
 ../03_assets/<page_id>/<safe_filename>
 ```
 
-Обоснование: файл Markdown лежит в `data/04_markdown/`, ассеты — в `data/03_assets/`; относительный путь от каталога md-файла — ровно `../03_assets/...`. Форма `../assets/...` из исходного черновика **запрещена** и не должна появляться ни в коде, ни в тестах, ни в примерах. В коде путь строится единственной функцией `asset_relative_path(page_id, safe_filename)` (см. §7.6).
+Обоснование: файл Markdown лежит в `../../../output/04_markdown/`, ассеты — в `../../../output/03_assets/`; относительный путь от каталога md-файла — ровно `../03_assets/...`. Форма `../assets/...` из исходного черновика **запрещена** и не должна появляться ни в коде, ни в тестах, ни в примерах. В коде путь строится единственной функцией `asset_relative_path(page_id, safe_filename)` (см. §7.6).
 
 Два sidecar-файла (`*.assets.json`, `*.links.json`) — нормативная часть bronze-слоя: карта `original → safe` обязательна (§7.5), индекс внутренних ссылок нужен, чтобы трансформация оставалась без сети (§6.7). Они лежат рядом с `01_raw/<page_id>.json` и никогда не участвуют в frontmatter.
 
@@ -92,10 +92,10 @@ CLI + Prefect 3.x pipeline `confluence-md-exporter`:
 
 1. читает список URL страниц из `input/urls.txt`;
 2. резолвит URL в `page_id` (несколько форм URL, обе редакции Confluence);
-3. выгружает raw JSON (`metadata` + `body.storage`) в bronze-слой `data/01_raw/`;
-4. выгружает вложения и встроенные медиа через REST в `data/03_assets/<page_id>/`;
-5. нормализует Storage Format (`ac:*`, `ri:*`) в clean HTML `data/02_interim/`;
-6. собирает GFM Markdown с обязательным YAML frontmatter в `data/04_markdown/`;
+3. выгружает raw JSON (`metadata` + `body.storage`) в bronze-слой `../../../output/01_raw/`;
+4. выгружает вложения и встроенные медиа через REST в `../../../output/03_assets/<page_id>/`;
+5. нормализует Storage Format (`ac:*`, `ri:*`) в clean HTML `../../../output/02_interim/`;
+6. собирает GFM Markdown с обязательным YAML frontmatter в `../../../output/04_markdown/`;
 7. пишет `manifest.json` и `run_report.json`, публикует Prefect-артефакты в UI.
 
 ### 1.3. Цели (измеримые)
@@ -2548,7 +2548,7 @@ EXPORT_FORCE_REFRESH=false
 LOG_LEVEL=INFO
 ```
 
-`.gitignore` обязан содержать: `.env`, `data/`, `.venv/`, `__pycache__/`, `.pytest_cache/`, `.ruff_cache/`, `.mypy_cache/`, `*.tmp-*`.
+`.gitignore` обязан содержать: `.env`, `../../../output/`, `.venv/`, `__pycache__/`, `.pytest_cache/`, `.ruff_cache/`, `.mypy_cache/`, `*.tmp-*`.
 
 ### 11.4. Логирование
 

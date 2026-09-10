@@ -82,6 +82,43 @@ class ConfluenceClient:
         except (TypeError, ValueError):
             return None
 
+    def fetch_page_version(self, page_id: str, version: int) -> PageFetchResult:
+        try:
+            query = urllib.parse.urlencode({"version": version, "status": "historical", "expand": EXPAND})
+            response = self._request(self._url(f"/rest/api/content/{page_id}?{query}"))
+            if response.status == 200:
+                payload = response.json()
+                if isinstance(payload, dict) and payload.get("id"):
+                    raw = _to_bronze(self._settings, payload, [])
+                    return PageFetchResult("ok", None, raw["page_id"], raw["space_key"], raw["title"], raw)
+
+            query_ver = urllib.parse.urlencode({
+                "expand": "content.body.storage,content.version,content.space,content.history,content.metadata.labels"
+            })
+            response_ver = self._request(self._url(f"/rest/api/content/{page_id}/version/{version}?{query_ver}"))
+            if response_ver.status == 200:
+                payload_ver = response_ver.json()
+                if isinstance(payload_ver, dict):
+                    content = payload_ver.get("content")
+                    if isinstance(content, dict):
+                        content.setdefault("id", page_id)
+                        content.setdefault("version", {
+                            "number": payload_ver.get("number") or version,
+                            "when": payload_ver.get("when"),
+                            "by": payload_ver.get("by"),
+                        })
+                        raw = _to_bronze(self._settings, content, [])
+                        return PageFetchResult("ok", None, raw["page_id"], raw["space_key"], raw["title"], raw)
+
+            # Check if current version matches requested version
+            current = self._fetch_by_id(page_id)
+            if current.status == "ok" and current.raw and int(current.raw.get("version") or 0) == version:
+                return current
+
+            return PageFetchResult("failed", f"version_{version}_not_found", page_id, None, None, None)
+        except Exception as exc:
+            return PageFetchResult("failed", str(exc), page_id, None, None, None)
+
     def fetch_entry(self, entry: AcceptedEntry) -> PageFetchResult:
         try:
             if entry.needs_title_lookup:
@@ -258,11 +295,11 @@ def _default_sleep(seconds: float) -> None:
 
 
 def _to_bronze(settings: Settings, payload: dict[str, Any], attachments: list[dict[str, Any]]) -> dict[str, Any]:
-    page_id = str(payload["id"])
+    page_id = str(payload.get("id") or "")
     space = payload.get("space") or {}
     version = payload.get("version") or {}
     history = payload.get("history") or {}
-    created = history.get("createdBy") or version.get("by") or {}
+    author = version.get("by") or history.get("createdBy") or {}
     labels = [
         str(item.get("name"))
         for item in ((payload.get("metadata") or {}).get("labels") or {}).get("results") or []
@@ -281,7 +318,7 @@ def _to_bronze(settings: Settings, payload: dict[str, Any], attachments: list[di
         "space_key": str(space.get("key") or ""),
         "version": int(version.get("number") or 0),
         "status": str(payload.get("status") or ""),
-        "created_by": str(created.get("displayName") or created.get("username") or created.get("accountId") or ""),
+        "created_by": str(author.get("displayName") or author.get("username") or author.get("accountId") or ""),
         "updated_at": str(version.get("when") or ""),
         "source_url": build_source_url(settings.confluence_base_url, page_id, webui),
         "labels": labels,

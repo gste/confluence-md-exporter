@@ -1,8 +1,10 @@
-"""Prefect 3.x export flow: isolate pages, write catalog/report, publish artifacts."""
+"""Export flow: isolate pages, support diff URLs, write catalog/report, publish artifacts."""
 
 from __future__ import annotations
 
+import difflib
 import json
+import shutil
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
@@ -15,9 +17,10 @@ from prefect.artifacts import create_markdown_artifact
 from confluence_md_exporter.assets import sync_page_assets
 from confluence_md_exporter.client import ConfluenceClient, PageFetchResult
 from confluence_md_exporter.disk_skip import sync_page
-from confluence_md_exporter.layout import asset_sidecar_path, assets_dir_path
+from confluence_md_exporter.layout import asset_sidecar_path, assets_dir_path, slugify
 from confluence_md_exporter.output import (
     write_bronze,
+    write_diff_markdown,
     write_gold_markdown,
     write_interim,
     write_manifest,
@@ -47,8 +50,8 @@ class PageOutcome:
 
 
 @flow(name="confluence-md-export")
-def export_flow(settings: Settings) -> int:
-    return run_export(settings)
+def export_flow(settings: Settings, *, clean: bool = False) -> int:
+    return run_export(settings, clean=clean)
 
 
 def run_export(
@@ -56,19 +59,27 @@ def run_export(
     *,
     client: ConfluenceClient | None = None,
     publish: PublishFn | None = None,
+    clean: bool = False,
 ) -> int:
     started = _now()
     output_dir = Path(settings.export_output_dir)
+    if clean and output_dir.exists():
+        shutil.rmtree(output_dir)
+    output_dir.mkdir(parents=True, exist_ok=True)
+
     resolved = resolve_input_file(settings.export_input_file, settings.confluence_base_url)
     http = client or ConfluenceClient(settings)
     publisher = publish or _publish_markdown
 
     fetches = _fetch_all(http, output_dir, resolved.entries, settings)
     batch_pages = _batch_pages(fetches)
-    outcomes = [
-        _finish_page(output_dir, settings, fetch, batch_pages, publisher)
-        for fetch in fetches
-    ]
+    outcomes: list[PageOutcome] = []
+    for entry, fetch in zip(resolved.entries, fetches):
+        if entry.is_diff and entry.diff_versions:
+            outcome = _finish_diff_page(output_dir, settings, http, entry, publisher)
+        else:
+            outcome = _finish_page(output_dir, settings, fetch, batch_pages, publisher)
+        outcomes.append(outcome)
 
     records = [_manifest_row(item) for item in outcomes]
     write_manifest(output_dir, records)
@@ -112,6 +123,11 @@ def _fetch_all(
     if not entries:
         return []
     workers = max(1, settings.export_concurrency)
+
+    # Single thread mode (KISS) - avoid ThreadPoolExecutor entirely
+    if workers == 1:
+        return [_fetch_one(client, output_dir, entry, settings.export_force_refresh) for entry in entries]
+
     results: list[PageFetchResult | None] = [None] * len(entries)
 
     def work(index: int, entry: AcceptedEntry) -> tuple[int, PageFetchResult]:
@@ -149,6 +165,8 @@ def _fetch_one(
     force_refresh: bool,
 ) -> PageFetchResult:
     try:
+        if entry.is_diff:
+            return PageFetchResult("ok", None, entry.page_id, None, None, None)
         if entry.page_id and not entry.needs_title_lookup:
             return sync_page(client, output_dir, entry.page_id, force_refresh=force_refresh)
         result = client.fetch_entry(entry)
@@ -184,6 +202,97 @@ def _finish_page(
             assets_dir=assets_dir_path(fetch.page_id) if fetch.page_id else None,
             labels=list((fetch.raw or {}).get("labels") or []),
         )
+
+
+def _finish_diff_page(
+    output_dir: Path,
+    settings: Settings,
+    client: ConfluenceClient,
+    entry: AcceptedEntry,
+    publish: PublishFn,
+) -> PageOutcome:
+    page_id = entry.page_id or ""
+    if not entry.diff_versions:
+        return PageOutcome("failed", "invalid_diff_versions", page_id, None, None, None, None, None, None)
+    v1, v2 = entry.diff_versions
+    fetch_v1 = client.fetch_page_version(page_id, v1)
+    fetch_v2 = client.fetch_page_version(page_id, v2)
+
+    if fetch_v1.status != "ok" or not fetch_v1.raw:
+        return PageOutcome("failed", fetch_v1.error or f"version_{v1}_failed", page_id, None, None, None, None, None, None)
+    if fetch_v2.status != "ok" or not fetch_v2.raw:
+        return PageOutcome("failed", fetch_v2.error or f"version_{v2}_failed", page_id, None, None, None, None, None, None)
+
+    raw1 = fetch_v1.raw
+    raw2 = fetch_v2.raw
+    title = str(raw2.get("title") or raw1.get("title") or f"page_{page_id}")
+    space_key = str(raw2.get("space_key") or raw1.get("space_key") or "")
+    slug = slugify(title)
+
+    ctx1 = TransformContext(page_id=page_id, original_to_safe={}, attachments=[], batch_pages=(), base_url=settings.confluence_base_url)
+    ctx2 = TransformContext(page_id=page_id, original_to_safe={}, attachments=[], batch_pages=(), base_url=settings.confluence_base_url)
+    t1 = transform_storage(str(raw1.get("body_storage") or ""), context=ctx1)
+    t2 = transform_storage(str(raw2.get("body_storage") or ""), context=ctx2)
+
+    lines1 = (t1.markdown or "").splitlines(keepends=True)
+    lines2 = (t2.markdown or "").splitlines(keepends=True)
+    diff_lines = list(difflib.unified_diff(
+        lines1,
+        lines2,
+        fromfile=f"v{v1}.md",
+        tofile=f"v{v2}.md",
+        lineterm="",
+    ))
+    diff_text = "".join(line if line.endswith("\n") else line + "\n" for line in diff_lines)
+
+    lines_added = sum(1 for line in diff_lines if line.startswith("+") and not line.startswith("+++"))
+    lines_removed = sum(1 for line in diff_lines if line.startswith("-") and not line.startswith("---"))
+
+    frontmatter = {
+        "id": page_id,
+        "title": title,
+        "space_key": space_key,
+        "version_from": v1,
+        "version_to": v2,
+        "created_by_from": str(raw1.get("created_by") or ""),
+        "updated_at_from": str(raw1.get("updated_at") or ""),
+        "created_by_to": str(raw2.get("created_by") or ""),
+        "updated_at_to": str(raw2.get("updated_at") or ""),
+        "source_url": entry.raw,
+        "lines_added": lines_added,
+        "lines_removed": lines_removed,
+    }
+
+    body = (
+        f"\n# Diff: {title} (v{v1} -> v{v2})\n\n"
+        f"- **Page ID**: {page_id}\n"
+        f"- **Space**: {space_key}\n"
+        f"- **From**: Version {v1} by *{frontmatter['created_by_from']}* ({frontmatter['updated_at_from']})\n"
+        f"- **To**: Version {v2} by *{frontmatter['created_by_to']}* ({frontmatter['updated_at_to']})\n"
+        f"- **Changes**: +{lines_added} / -{lines_removed} lines\n\n"
+        f"## Unified Diff\n\n"
+        f"```diff\n{diff_text}```\n"
+    )
+
+    path = write_diff_markdown(output_dir, page_id, slug, v1, v2, frontmatter, body)
+    publish(
+        markdown=f"# Diff v{v1} -> v{v2} for {page_id}\n\n+{lines_added} / -{lines_removed} lines\n",
+        key=f"diff-{page_id}-v{v1}-v{v2}",
+        description=f"Diff v{v1}->v{v2} preview for {page_id}",
+    )
+    return PageOutcome(
+        status="ok",
+        error=None,
+        page_id=page_id,
+        title=title,
+        space_key=space_key,
+        version=v2,
+        source_url=entry.raw,
+        md_path=path.relative_to(output_dir).as_posix(),
+        assets_dir=None,
+        labels=list(raw2.get("labels") or []),
+        markdown=body,
+    )
 
 
 def _write_ok_page(
@@ -380,7 +489,10 @@ def _summary_markdown(
 
 
 def _publish_markdown(*, markdown: str, key: str | None = None, description: str | None = None) -> Any:
-    return create_markdown_artifact(markdown=markdown, key=key, description=description)
+    try:
+        return create_markdown_artifact(markdown=markdown, key=key, description=description)
+    except Exception:
+        return None
 
 
 def _now() -> str:

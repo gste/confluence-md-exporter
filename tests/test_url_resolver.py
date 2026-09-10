@@ -72,6 +72,37 @@ def test_relative_path_resolved_against_base(tmp_path: Path) -> None:
     assert result.entries[0].page_id == "106"
 
 
+def test_diff_page_url_with_selected_versions(tmp_path: Path) -> None:
+    url = f"{BASE}/pages/diffpagesbyversion.action?pageId=607636678&selectedPageVersions=41&selectedPageVersions=42"
+    path = _write(tmp_path, f"{url}\n")
+    result = resolve_input_file(path, BASE)
+    assert result.pages_total == 1
+    entry = result.entries[0]
+    assert entry.page_id == "607636678"
+    assert entry.is_diff is True
+    assert entry.diff_versions == (41, 42)
+    assert result.invalid_urls == ()
+
+
+def test_diff_page_url_with_original_and_revised_version(tmp_path: Path) -> None:
+    url = f"{BASE}/pages/diffpagesbyversion.action?pageId=607636678&originalVersion=41&revisedVersion=42"
+    path = _write(tmp_path, f"{url}\n")
+    result = resolve_input_file(path, BASE)
+    assert result.pages_total == 1
+    entry = result.entries[0]
+    assert entry.page_id == "607636678"
+    assert entry.is_diff is True
+    assert entry.diff_versions == (41, 42)
+
+
+def test_diff_page_url_malformed_missing_version(tmp_path: Path) -> None:
+    url = f"{BASE}/pages/diffpagesbyversion.action?pageId=607636678&selectedPageVersions=41"
+    path = _write(tmp_path, f"{url}\n")
+    result = resolve_input_file(path, BASE)
+    assert result.pages_total == 0
+    assert result.invalid_urls == (InvalidUrl(url=url, reason="malformed"),)
+
+
 def test_tiny_link_is_invalid_with_reason(tmp_path: Path, caplog: pytest.LogCaptureFixture) -> None:
     path = _write(tmp_path, f"{BASE}/x/AbCdEf\n")
     with caplog.at_level("WARNING"):
