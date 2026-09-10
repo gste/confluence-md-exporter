@@ -1,4 +1,4 @@
-"""Serialize bronze, sidecar, interim, gold Markdown, manifest, and run report."""
+"""Serialize bronze, sidecar, interim, gold Markdown, diff Markdown, manifest, and run report."""
 
 from __future__ import annotations
 
@@ -9,6 +9,7 @@ from typing import Any, Mapping, Sequence
 
 from confluence_md_exporter.layout import (
     asset_sidecar_path,
+    diff_markdown_path,
     gold_markdown_path,
     interim_html_path,
     manifest_path,
@@ -50,6 +51,21 @@ FRONTMATTER_KEYS = (
     "breadcrumbs",
     "attachments_count",
     "unsupported_macros",
+)
+
+DIFF_FRONTMATTER_KEYS = (
+    "id",
+    "title",
+    "space_key",
+    "version_from",
+    "version_to",
+    "created_by_from",
+    "updated_at_from",
+    "created_by_to",
+    "updated_at_to",
+    "source_url",
+    "lines_added",
+    "lines_removed",
 )
 
 MANIFEST_KEYS = (
@@ -140,6 +156,24 @@ def write_gold_markdown(
     return path
 
 
+def write_diff_markdown(
+    output_dir: Path,
+    page_id: str,
+    slug: str,
+    v_from: int,
+    v_to: int,
+    frontmatter: Mapping[str, Any],
+    diff_body: str,
+) -> Path:
+    data = dict(frontmatter)
+    _require_keys(data, DIFF_FRONTMATTER_KEYS)
+    path = output_dir / diff_markdown_path(page_id, slug, v_from, v_to)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    header = _dump_custom_frontmatter(data, DIFF_FRONTMATTER_KEYS)
+    path.write_text(header + diff_body, encoding="utf-8")
+    return path
+
+
 def write_manifest(output_dir: Path, records: Sequence[Mapping[str, Any]]) -> Path:
     payload: list[dict[str, Any]] = []
     for record in records:
@@ -198,6 +232,14 @@ def _write_json(path: Path, payload: Any) -> None:
 def _dump_frontmatter(data: Mapping[str, Any]) -> str:
     lines = ["---"]
     for key in FRONTMATTER_KEYS:
+        lines.extend(_yaml_lines(key, data[key]))
+    lines.append("---")
+    return "\n".join(lines) + "\n"
+
+
+def _dump_custom_frontmatter(data: Mapping[str, Any], keys: Sequence[str]) -> str:
+    lines = ["---"]
+    for key in keys:
         lines.extend(_yaml_lines(key, data[key]))
     lines.append("---")
     return "\n".join(lines) + "\n"

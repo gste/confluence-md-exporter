@@ -1,6 +1,7 @@
-# Local export dumps
+# Local export dumps and inputs
 data/
 output/
+input/
 
 # Credentials (keep `.env.example`)
 .env
