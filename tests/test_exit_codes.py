@@ -6,7 +6,7 @@ from unittest.mock import Mock
 
 import pytest
 
-from confluence_md_exporter.cli import main, parse_cli
+from confluence_md_exporter.cli import build_parser, main, parse_cli
 from confluence_md_exporter.client import ConfluenceClient, HttpResponse
 from confluence_md_exporter.flow import run_export
 from confluence_md_exporter.output import (
@@ -34,10 +34,26 @@ def _env(tmp_path: Path, **overrides: str) -> dict[str, str]:
 
 
 def test_version_flag(capsys: pytest.CaptureFixture[str]) -> None:
+    from confluence_md_exporter import __version__
+
     with pytest.raises(SystemExit) as exc:
         parse_cli(["--version"])
     assert exc.value.code == 0
-    assert "1.0.0" in capsys.readouterr().out
+    assert __version__ in capsys.readouterr().out
+    assert __version__.startswith("1.0.1")
+
+
+def test_help_describes_defaults_examples_and_hides_simple() -> None:
+    text = build_parser().format_help()
+    assert "input/urls.txt" in text
+    assert "output/" in text
+    assert "anonymous" in text
+    assert "-i urls.txt -o output -t PAT" in text
+    assert "--base-url" in text
+    assert "Exit codes" in text
+    assert "README.ru.md" not in text
+    assert "--simple" not in text
+    assert "Ignored:" not in text
 
 
 def test_exit_2_on_bad_config(tmp_path: Path) -> None:

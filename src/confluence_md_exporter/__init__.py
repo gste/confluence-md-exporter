@@ -3,6 +3,9 @@
 from importlib.metadata import PackageNotFoundError, version
 
 try:
-    __version__ = version("confluence-md-exporter")
-except PackageNotFoundError:  # pragma: no cover - source tree without install
-    __version__ = "1.0.0"
+    from confluence_md_exporter._version import __version__
+except ImportError:  # pragma: no cover - source tree before hatch-vcs writes _version.py
+    try:
+        __version__ = version("confluence-md-exporter")
+    except PackageNotFoundError:
+        __version__ = "0.0.0"

@@ -1,156 +1,135 @@
 # confluence-md-exporter
 
-Локальный read-only конвейер: выгрузка страниц Confluence Server/Data Center → Markdown, медиа-ассеты, diff-сравнение версий и каталог батча. Закон реализации — [спецификация](https://github.com/gste/confluence-md-exporter/blob/master/docs/spec/README.md).
+**English** | [Русский](README.ru.md)
 
-## Установка
+Local read-only export of **Confluence Server/Data Center** pages to Markdown: page body, attachments, version diffs, and a batch report.
 
-Требуется Python `>=3.11,<3.14`.
+It does not write to Confluence, walk descendants, or talk to Cloud. Python `>=3.11,<3.14`.
+
+## Install
 
 ```bash
 pip install confluence-md-exporter
 ```
 
-Или через `uv`:
+or
 
 ```bash
 uv tool install confluence-md-exporter
 ```
 
-Из исходников:
+Check: `confluence-md-exporter --version`. Help: `confluence-md-exporter -h`.
 
-```bash
-uv sync
-```
+## Use cases
 
-## Запуск
+In every example the URL list is a UTF-8 text file, one page per line. `#…` lines and blank lines are ignored.
 
-По умолчанию: вход `input/urls.txt`, выход `output/`, доступ анонимный. База Confluence берётся из абсолютных URL в списке — отдельный `--base-url` не нужен, если в файле есть полные ссылки.
+### Public instance
 
-Стартовый список ссылок:
+Pages are readable without login. The Confluence base URL is taken from absolute links, so `--base-url` is not needed.
 
-```bash
-cp input/urls.txt.example input/urls.txt
-```
-
-Закрытый инстанс (нужны учётные данные):
-
-```bash
-uv run confluence-md-exporter -u USER -t TOKEN
-```
-
-Только PAT (Bearer):
-
-```bash
-uv run confluence-md-exporter -t TOKEN
-```
-
-`.env` не обязателен. Если удобнее держать креды в файле — [`.env.example`](https://github.com/gste/confluence-md-exporter/blob/master/.env.example) и `uv run --env-file .env confluence-md-exporter`. CLI-флаги перекрывают окружение.
-
----
-
-## Форматы входных ссылок (input/urls.txt)
-
-Файл `input/urls.txt` (UTF-8, одна ссылка на строку; строки с `#` и пустые строки игнорируются).
-
-Поддерживаются:
-1. **Прямые страницы по ID**:
-   - `https://confluence.example.com/pages/viewpage.action?pageId=123456`
-   - `https://confluence.example.com/wiki/spaces/SPACE/pages/123456/Some+Page+Title`
-   - `123456` (чистый идентификатор)
-2. **Страницы по Space и Title**:
-   - `https://confluence.example.com/display/SPACE/Page+Title`
-3. **Diff-страницы (сравнение версий)**:
-   - `https://confluence.example.com/pages/diffpagesbyversion.action?pageId=607636678&selectedPageVersions=41&selectedPageVersions=42`
-   - `https://confluence.example.com/pages/diffpagesbyversion.action?pageId=607636678&originalVersion=41&revisedVersion=42`
-
-*Примечание: неподдерживаемые форматы (tiny-link `/x/...` и т.д.) помечаются в `run_report.json` как `invalid_urls` и не валят батч.*
-
----
-
-## CLI команды и флаги
+`urls.txt`:
 
 ```text
-usage: confluence-md-exporter [-h] [--version] [-i INPUT] [-o OUTPUT]
-                              [-u USER] [-t TOKEN] [--base-url URL] [-r] [-c] [-s]
-
-options:
-  --version             Версия пакета
-  -i, --input INPUT     Список URL (default: input/urls.txt)
-  -o, --output OUTPUT   Каталог выгрузки (default: output)
-  -u, --user USER       Имя пользователя (вместе с -t — HTTP Basic)
-  -t, --token TOKEN     PAT или пароль
-  --base-url URL        База инстанса, если её нельзя вывести из списка URL
-  -r, --refresh         Игнорировать disk-skip
-  -c, --clean           Очистить каталог выгрузки перед работой
+https://confluence.example.com/pages/viewpage.action?pageId=123456
+https://confluence.example.com/display/SPACE/Page+Title
 ```
 
-Выгрузка всегда однопоточная: один процесс, страницы строго последовательно, без Prefect и без лишних серверов. В консоли на уровне INFO виден прогресс каждой страницы и итоговая сводка.
-
----
-
-## Примеры использования
-
-### 1. Обычный запуск
-Выгрузка страниц по списку из `input/urls.txt` (анонимно, база из URL):
 ```bash
-uv run confluence-md-exporter
+confluence-md-exporter -i urls.txt -o output
 ```
 
-### 2. Чистая выгрузка с очисткой папки
-Полная очистка папки выгрузки и выгрузка заново:
+### Private instance: Personal Access Token
+
+Token without a username → Bearer.
+
 ```bash
-uv run confluence-md-exporter -c
+confluence-md-exporter -i urls.txt -o output -t PAT
 ```
 
-### 3. Принудительное обновление кэша (Refresh)
-Перескачивание контента даже при совпадении версий на диске:
+### Private instance: username and password (or username and PAT)
+
+Username + token → HTTP Basic.
+
 ```bash
-uv run confluence-md-exporter -r
+confluence-md-exporter -i urls.txt -o output -u USER -t TOKEN
 ```
 
-### 4. Указание произвольных входных и выходных путей
+### Page ids only
+
+If the list is ids such as `123456` rather than full URLs, the base URL must be set explicitly.
+
+`ids.txt`:
+
+```text
+123456
+789012
+```
+
 ```bash
-uv run confluence-md-exporter -i ./my_pages.txt -o ./exports/march_release
+confluence-md-exporter -i ids.txt -o output --base-url https://confluence.example.com
 ```
 
-### 5. Выгрузка разницы версий (Diff)
-Добавь в файл ссылок URL вида:
+### Compare two versions of a page
+
+Put a Confluence diff URL in the list. Markdown with YAML metadata and a ` ```diff ` block is written under `output/05_diffs/`.
+
 ```text
 https://confluence.example.com/pages/diffpagesbyversion.action?pageId=607636678&selectedPageVersions=41&selectedPageVersions=42
 ```
-И запусти:
+
 ```bash
-uv run confluence-md-exporter
+confluence-md-exporter -i urls.txt -o output -t PAT
 ```
-В результате в папке `05_diffs/` будет создан файл `607636678_title_v41_to_v42.md` с YAML-метаданными (авторы версий, даты, статистика `+X/-Y`) и блоком ` ```diff `.
 
----
+### Re-run, refresh, clean start
 
-## Структура выгрузки (Output)
+A second run into the same `-o` skips a page when the local version matches the server and attachment files are still on disk (disk-skip).
+
+| Goal | Command |
+|---|---|
+| Fetch only what changed | `confluence-md-exporter -i urls.txt -o output` |
+| Re-fetch everything, keep the directory | `confluence-md-exporter -i urls.txt -o output -r` |
+| Delete the output and export from scratch | `confluence-md-exporter -i urls.txt -o output -c` |
+
+Credentials can live in `.env` (`CONFLUENCE_TOKEN`, `CONFLUENCE_USERNAME`, …). CLI flags override the environment. Do not commit `.env`.
+
+## Input line formats
+
+| Kind | Example |
+|---|---|
+| Page by id | `https://host/pages/viewpage.action?pageId=123456` |
+| Page in a space | `https://host/wiki/spaces/SPACE/pages/123456/Title` |
+| Id only | `123456` (needs `--base-url` if the file has no absolute URLs) |
+| Space and title | `https://host/display/SPACE/Page+Title` |
+| Version diff | `…/pages/diffpagesbyversion.action?pageId=…&selectedPageVersions=41&selectedPageVersions=42` |
+| Version diff | `…/diffpagesbyversion.action?pageId=…&originalVersion=41&revisedVersion=42` |
+
+Unsupported lines (tiny-link `/x/…` and the like) are recorded in `run_report.json` as `invalid_urls` and do not fail the batch.
+
+## Output layout
 
 ```text
 output/
-├── 01_raw/             # Сырой Confluence JSON ответа REST API
-├── 02_interim/         # Storage XML страницы
-├── 03_assets/          # Скачанные вложения и картинки (по page_id)
-├── 04_markdown/        # Итоговый Markdown (*.md) и manifest.json
-├── 05_diffs/           # Unified diff между версиями страниц (*_v41_to_v42.md)
-└── run_report.json     # Сводный отчет о результатах выгрузки батча
+├── 01_raw/             # raw REST JSON
+├── 02_interim/         # Storage XML
+├── 03_assets/          # attachments and images (per page_id)
+├── 04_markdown/        # Markdown pages and manifest.json
+├── 05_diffs/           # unified diff of two versions (*_v41_to_v42.md)
+└── run_report.json     # batch summary
 ```
 
----
+## Exit codes
 
-## Коды возврата (Exit Codes)
+| Code | When |
+|---|---|
+| `0` | every processed page is `ok` or `skipped` |
+| `1` | at least one page is `failed` |
+| `2` | missing input file, bad configuration, or failed authentication |
 
-- `0` — успех (все страницы обработаны со статусом `ok` или `skipped`);
-- `1` — частичная ошибка (хотя бы одна страница завершилась со статусом `failed`);
-- `2` — критическая ошибка конфигурации / непройденная авторизация / отсутствует входной файл.
+## Development
 
----
-
-## Разработка и тестирование
-
-Запуск полного набора тестов:
 ```bash
+uv sync
 uv run python -m pytest
 ```
