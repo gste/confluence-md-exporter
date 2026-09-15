@@ -38,17 +38,11 @@ Changelog = "https://github.com/gste/confluence-md-exporter/blob/master/CHANGELO
 confluence-md-exporter = "confluence_md_exporter.cli:entry"
 
 [build-system]
-requires = ["hatchling", "hatch-vcs"]
+requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [tool.hatch.version]
-source = "vcs"
-
-[tool.hatch.version.raw-options]
-local_scheme = "no-local-version"
-
-[tool.hatch.build.hooks.vcs]
-version-file = "src/confluence_md_exporter/_version.py"
+path = "src/confluence_md_exporter/__init__.py"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/confluence_md_exporter"]
