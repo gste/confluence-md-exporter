@@ -1,0 +1,68 @@
+name: Auto Tag on Merge
+
+on:
+  push:
+    branches:
+      - master
+      - main
+
+jobs:
+  check-and-tag:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write  # Required to push git tags
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          submodules: true
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies & package
+        run: |
+          pip install -e .
+          pip install pytest
+
+      - name: Run test suite
+        run: pytest
+
+      - name: Validate version consistency and check/create tag
+        id: tagger
+        run: |
+          # 1. Extract version from code
+          VERSION=$(python -c "import confluence_md_exporter; print(confluence_md_exporter.__version__)")
+          echo "Package version: $VERSION"
+
+          # 2. Check that CHANGELOG.md contains release notes for this version
+          if ! grep -q -E "^## $VERSION\b" CHANGELOG.md; then
+            echo "::error::CHANGELOG.md does not contain a release entry for version $VERSION ('## $VERSION')"
+            exit 1
+          fi
+          echo "CHANGELOG.md check passed for version $VERSION"
+
+          # 3. Check if git tag already exists
+          TAG_NAME="v$VERSION"
+          if git rev-parse "$TAG_NAME" >/dev/null 2>&1; then
+            echo "Tag $TAG_NAME already exists. Skipping tagging."
+            echo "should_tag=false" >> $GITHUB_OUTPUT
+          else
+            echo "Tag $TAG_NAME does not exist. Ready to tag."
+            echo "should_tag=true" >> $GITHUB_OUTPUT
+            echo "tag_name=$TAG_NAME" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Push Git Tag
+        if: steps.tagger.outputs.should_tag == 'true'
+        run: |
+          TAG_NAME="${{ steps.tagger.outputs.tag_name }}"
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git tag -a "$TAG_NAME" -m "Release $TAG_NAME"
+          git push origin "$TAG_NAME"
+          echo "Successfully created and pushed tag $TAG_NAME"
