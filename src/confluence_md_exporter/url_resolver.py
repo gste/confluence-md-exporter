@@ -18,6 +18,12 @@ _DISPLAY = re.compile(r"^/display/([^/]+)/(.+)$")
 _WIKI_PAGE = re.compile(r"^/wiki/spaces/([^/]+)/pages/(\d+)(?:/.*)?$")
 _BARE_PAGE_ID = re.compile(r"^\d+$")
 _TINY_LINK = re.compile(r"(?:^|/)x/[^/]+$")
+_BASE_MARKERS = (
+    "/pages/viewpage.action",
+    "/pages/diffpagesbyversion.action",
+    "/display/",
+    "/wiki/spaces/",
+)
 
 REASON_TINY_LINK = "tiny_link"
 REASON_ORIGIN_MISMATCH = "origin_mismatch"
@@ -50,6 +56,30 @@ class ResolveResult:
     entries: tuple[AcceptedEntry, ...]
     invalid_urls: tuple[InvalidUrl, ...]
     pages_total: int
+
+
+def infer_base_url(path: str | Path) -> str:
+    """Derive the application base from absolute URLs in the input list."""
+    file_path = Path(path)
+    if not file_path.is_file():
+        raise ConfigError(f"input file does not exist: {path}")
+
+    found: list[str] = []
+    for raw in file_path.read_text(encoding="utf-8").splitlines():
+        if _is_blank_or_comment(raw):
+            continue
+        base = _base_from_absolute(raw.strip())
+        if base is not None:
+            found.append(base)
+
+    unique = list(dict.fromkeys(found))
+    if not unique:
+        raise ConfigError(
+            "cannot infer CONFLUENCE_BASE_URL from input; add a full page URL or pass --base-url"
+        )
+    if len(unique) > 1:
+        raise ConfigError("input URLs point to different Confluence bases: " + ", ".join(unique))
+    return unique[0]
 
 
 def resolve_input_file(path: str | Path, base_url: str) -> ResolveResult:
@@ -110,10 +140,12 @@ def _parse_line(raw: str, base_url: str) -> AcceptedEntry | InvalidUrl:
 
     absolute = _to_absolute(stripped, base_url)
     if absolute is None:
-        return None
+        return InvalidUrl(url=raw, reason=REASON_UNRECOGNIZED)
+    if _origin(absolute) != _origin(base_url):
+        return InvalidUrl(url=raw, reason=REASON_ORIGIN_MISMATCH)
     path = _path_relative_to_base(absolute, base_url)
     if path is None:
-        return None
+        return InvalidUrl(url=raw, reason=REASON_UNRECOGNIZED)
     query = parse_qs(urlparse(absolute).query)
 
     if path == _VIEWPAGE_PATH:
@@ -192,6 +224,28 @@ def _parse_line(raw: str, base_url: str) -> AcceptedEntry | InvalidUrl:
 
 def _is_tiny_link(path: str) -> bool:
     return _TINY_LINK.search(path) is not None or "tinyurl.action" in path
+
+
+def _base_from_absolute(stripped: str) -> str | None:
+    parsed = urlparse(stripped)
+    if parsed.scheme not in {"http", "https"} or not parsed.hostname:
+        return None
+    if parsed.username or parsed.password:
+        return None
+    path = parsed.path or ""
+    marker_at: int | None = None
+    for marker in _BASE_MARKERS:
+        idx = path.find(marker)
+        if idx == -1:
+            continue
+        if marker_at is None or idx < marker_at:
+            marker_at = idx
+    if marker_at is None:
+        return None
+    prefix = path[:marker_at].rstrip("/")
+    if "wiki" in {segment for segment in prefix.split("/") if segment}:
+        return None
+    return f"{parsed.scheme}://{parsed.netloc}{prefix}"
 
 
 def _to_absolute(stripped: str, base_url: str) -> str | None:

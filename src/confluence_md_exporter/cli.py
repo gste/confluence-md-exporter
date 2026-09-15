@@ -55,6 +55,27 @@ def parse_cli(argv: Sequence[str] | None = None) -> argparse.Namespace:
         help="Clean output directory before export",
     )
     parser.add_argument(
+        "-u",
+        "--user",
+        "--username",
+        dest="username",
+        default=None,
+        help="Confluence username (with --token uses HTTP Basic)",
+    )
+    parser.add_argument(
+        "-t",
+        "--token",
+        dest="token",
+        default=None,
+        help="Personal Access Token or password",
+    )
+    parser.add_argument(
+        "--base-url",
+        dest="base_url",
+        default=None,
+        help="Confluence base URL (otherwise inferred from input URLs)",
+    )
+    parser.add_argument(
         "-s",
         "--simple",
         dest="simple",
@@ -91,18 +112,29 @@ def main(
             input_file=args.input,
             output_dir=args.output,
             force_refresh=args.force_refresh,
+            base_url=args.base_url,
+            username=args.username,
+            token=args.token,
         )
     except ConfigError as exc:
         print(str(exc), file=sys.stderr)
         return 2
 
     configure_logging(settings.log_level)
-    probe = auth_probe if auth_probe is not None else _default_auth_probe
-    try:
-        probe(settings)
-    except ConfigError as exc:
-        print(str(exc), file=sys.stderr)
-        return 2
+    if settings.confluence_auth_type == "anonymous":
+        logging.getLogger(__name__).info("Access: anonymous")
+    else:
+        logging.getLogger(__name__).info(
+            "Access: %s%s",
+            settings.confluence_auth_type,
+            f" user={settings.confluence_username}" if settings.confluence_username else "",
+        )
+        probe = auth_probe if auth_probe is not None else _default_auth_probe
+        try:
+            probe(settings)
+        except ConfigError as exc:
+            print(str(exc), file=sys.stderr)
+            return 2
 
     if args.clean:
         output_dir = Path(settings.export_output_dir)

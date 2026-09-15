@@ -44,11 +44,76 @@ def test_basic_without_username_rejected(tmp_path: Path) -> None:
         load_settings(_env(tmp_path, CONFLUENCE_AUTH_TYPE="basic"))
 
 
-def test_missing_required_key_rejected(tmp_path: Path) -> None:
+def test_bearer_without_token_rejected(tmp_path: Path) -> None:
     env = _env(tmp_path)
     del env["CONFLUENCE_TOKEN"]
     with pytest.raises(ConfigError, match="CONFLUENCE_TOKEN"):
         load_settings(env)
+
+
+def test_missing_creds_default_to_anonymous(tmp_path: Path) -> None:
+    env = _env(tmp_path)
+    del env["CONFLUENCE_TOKEN"]
+    del env["CONFLUENCE_AUTH_TYPE"]
+    settings = load_settings(env)
+    assert settings.confluence_auth_type == "anonymous"
+    assert settings.confluence_token == ""
+    assert settings.confluence_username is None
+
+
+def test_username_and_token_infer_basic(tmp_path: Path) -> None:
+    env = _env(tmp_path)
+    del env["CONFLUENCE_AUTH_TYPE"]
+    settings = load_settings(env, username="jdoe", token="pat-1")
+    assert settings.confluence_auth_type == "basic"
+    assert settings.confluence_username == "jdoe"
+    assert settings.confluence_token == "pat-1"
+
+
+def test_token_only_infers_bearer(tmp_path: Path) -> None:
+    env = _env(tmp_path)
+    del env["CONFLUENCE_AUTH_TYPE"]
+    del env["CONFLUENCE_TOKEN"]
+    settings = load_settings(env, token="pat-1")
+    assert settings.confluence_auth_type == "bearer"
+    assert settings.confluence_token == "pat-1"
+
+
+def test_base_url_inferred_from_input_urls(tmp_path: Path) -> None:
+    urls = tmp_path / "urls.txt"
+    urls.write_text(
+        "https://confluence.example.com/confluence/pages/viewpage.action?pageId=11\n",
+        encoding="utf-8",
+    )
+    env = {
+        "EXPORT_INPUT_FILE": str(urls),
+        "EXPORT_OUTPUT_DIR": str(tmp_path / "data"),
+    }
+    settings = load_settings(env)
+    assert settings.confluence_base_url == "https://confluence.example.com/confluence"
+    assert settings.confluence_auth_type == "anonymous"
+
+
+def test_cli_user_token_override_env(tmp_path: Path) -> None:
+    urls = tmp_path / "urls.txt"
+    urls.write_text("https://confluence.example.com/pages/viewpage.action?pageId=11\n", encoding="utf-8")
+    captured: dict[str, Settings] = {}
+
+    def run_export(settings: Settings) -> None:
+        captured["settings"] = settings
+
+    code = main(
+        argv=["-i", str(urls), "-o", str(tmp_path / "out"), "-u", "alice", "-t", "secret"],
+        environ={},
+        run_export=run_export,
+        auth_probe=lambda _settings: None,
+    )
+    assert code == 0
+    settings = captured["settings"]
+    assert settings.confluence_auth_type == "basic"
+    assert settings.confluence_username == "alice"
+    assert settings.confluence_token == "secret"
+    assert settings.confluence_base_url == "https://confluence.example.com"
 
 
 def test_cli_input_output_force_refresh_override_env(tmp_path: Path) -> None:
