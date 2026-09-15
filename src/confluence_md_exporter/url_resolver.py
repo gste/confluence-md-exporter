@@ -6,7 +6,7 @@ import logging
 import re
 from dataclasses import dataclass
 from pathlib import Path
-from urllib.parse import parse_qs, unquote_plus, urljoin, urlparse
+from urllib.parse import parse_qs, unquote_plus, urlparse
 
 from confluence_md_exporter.settings import ConfigError
 
@@ -105,13 +105,11 @@ def _parse_line(raw: str, base_url: str) -> AcceptedEntry | InvalidUrl:
 
     absolute = _to_absolute(stripped, base_url)
     if absolute is None:
-        return InvalidUrl(url=raw, reason=REASON_UNRECOGNIZED)
-    if _origin(absolute) != base_url:
-        return InvalidUrl(url=raw, reason=REASON_ORIGIN_MISMATCH)
-
-    parsed = urlparse(absolute)
-    path = parsed.path or ""
-    query = parse_qs(parsed.query)
+        return None
+    path = _path_relative_to_base(absolute, base_url)
+    if path is None:
+        return None
+    query = parse_qs(urlparse(absolute).query)
 
     if path == _VIEWPAGE_PATH:
         page_ids = query.get("pageId") or []
@@ -160,11 +158,37 @@ def _is_tiny_link(path: str) -> bool:
 
 def _to_absolute(stripped: str, base_url: str) -> str | None:
     if stripped.startswith("/"):
-        return urljoin(base_url + "/", stripped)
+        origin = _origin(base_url)
+        if not origin:
+            return None
+        return origin + stripped
     parsed = urlparse(stripped)
     if parsed.scheme and parsed.netloc:
         return stripped
     return None
+
+
+def _on_base(absolute: str, base_url: str) -> bool:
+    parsed_url = urlparse(absolute)
+    parsed_base = urlparse(base_url)
+    if parsed_url.scheme != parsed_base.scheme or parsed_url.netloc != parsed_base.netloc:
+        return False
+    base_path = (parsed_base.path or "").rstrip("/")
+    url_path = parsed_url.path or ""
+    if not base_path:
+        return True
+    return url_path == base_path or url_path.startswith(base_path + "/")
+
+
+def _path_relative_to_base(absolute: str, base_url: str) -> str | None:
+    if not _on_base(absolute, base_url):
+        return None
+    base_path = (urlparse(base_url).path or "").rstrip("/")
+    url_path = urlparse(absolute).path or ""
+    if not base_path:
+        return url_path
+    remainder = url_path[len(base_path) :]
+    return remainder if remainder else "/"
 
 
 def _origin(url: str) -> str:
