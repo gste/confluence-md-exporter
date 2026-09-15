@@ -47,7 +47,7 @@ build/
 skills-lock.json
 
 ### DeltaFuse ###
-.deltafuse/
+.deltafuse/gate-journal.jsonl
 docs/archive
 docs/changes
 docs/intake

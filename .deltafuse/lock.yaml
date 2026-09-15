@@ -1,0 +1,8 @@
+﻿schema_version: 2
+framework:
+  version: 2.5.0
+  source: deltafuse://v2.5.0
+  content_hash: sha256:8157e01e9b41ea45f7bf097ec2d91746838f5a38
+workflow:
+  call_width: wide
+  auto_accept_decisions: false
