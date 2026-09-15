@@ -48,6 +48,7 @@ def test_help_describes_defaults_examples_and_hides_simple() -> None:
     assert "-i urls.txt -o output -t PAT" in text
     assert "--base-url" in text
     assert "Коды выхода" in text
+    assert "README.ru.md" in text
     assert "показать справку и выйти" in text
     assert "--simple" not in text
     assert "Ignored:" not in text
