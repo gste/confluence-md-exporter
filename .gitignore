@@ -39,3 +39,15 @@ coverage.xml
 *.egg-info/
 dist/
 build/
+
+### Agents ###
+.cursor/
+.agents/
+.gemini/
+skills-lock.json
+
+### DeltaFuse ###
+.deltafuse/gate-journal.jsonl
+docs/archive
+docs/changes
+docs/intake

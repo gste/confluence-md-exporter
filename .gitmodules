@@ -1,0 +1,3 @@
+[submodule "deltafuse"]
+	path = deltafuse
+	url = https://github.com/gste/deltafuse.git

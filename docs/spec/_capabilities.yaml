@@ -1,0 +1,121 @@
+schema_version: 2
+domains:
+  core:
+    summary: Core system context and orchestration
+    capabilities:
+      context:
+        summary: System context, scope boundaries, actors, and global invariants
+        type: supporting
+        status: active
+        spec:
+          - docs/spec/00-context.md
+          - docs/spec/context.md
+      orchestration:
+        summary: Export batch execution, error isolation, and console progress reporting
+        type: business
+        status: active
+        spec:
+          - docs/spec/06-orchestration.md
+        code_roots:
+          - src/confluence_md_exporter/flow.py
+        test_roots:
+          - tests/test_flow.py
+
+  configuration:
+    summary: Application configuration, CLI interface, and authentication resolution
+    capabilities:
+      settings:
+        summary: Environment and CLI settings resolution, authentication credentials handling
+        type: supporting
+        status: active
+        spec:
+          - docs/spec/01-configuration.md
+        code_roots:
+          - src/confluence_md_exporter/settings.py
+        test_roots:
+          - tests/test_settings.py
+      cli:
+        summary: Command-line interface argument parsing, versioning, and process exit codes
+        type: operational
+        status: active
+        spec:
+          - docs/spec/01-configuration.md
+        code_roots:
+          - src/confluence_md_exporter/cli.py
+        test_roots:
+          - tests/test_exit_codes.py
+          - tests/test_cli_auth.py
+
+  ingestion:
+    summary: Input URL processing and Confluence REST API data fetching
+    capabilities:
+      input_parsing:
+        summary: URL list parsing, URL format recognition, deduplication, and invalid URL detection
+        type: data
+        status: active
+        spec:
+          - docs/spec/02-input.md
+        code_roots:
+          - src/confluence_md_exporter/input.py
+        test_roots:
+          - tests/test_input.py
+      confluence_fetch:
+        summary: Confluence Server/Data Center REST API client, page metadata, content, attachments, and disk-skip
+        type: integration
+        status: active
+        spec:
+          - docs/spec/04-fetch.md
+        code_roots:
+          - src/confluence_md_exporter/client.py
+        test_roots:
+          - tests/test_client.py
+
+  transformation:
+    summary: Content conversion from Confluence Storage Format to Markdown
+    capabilities:
+      markdown_transform:
+        summary: Storage Format XHTML to GFM Markdown conversion, macro handling, and HTML fallback
+        type: business
+        status: active
+        spec:
+          - docs/spec/05-transform.md
+        code_roots:
+          - src/confluence_md_exporter/transform.py
+        test_roots:
+          - tests/test_transform.py
+
+  storage:
+    summary: Multi-layer export artifact storage, manifests, and reports
+    capabilities:
+      artifact_layout:
+        summary: Four-layer output layout (raw, transformed, assets, markdown), manifest.json, run_report.json, and slug generation
+        type: data
+        status: active
+        spec:
+          - docs/spec/03-output.md
+        code_roots:
+          - src/confluence_md_exporter/storage.py
+        test_roots:
+          - tests/test_storage.py
+
+  quality:
+    summary: Test suites, verification policies, and acceptance criteria
+    capabilities:
+      test_suite:
+        summary: Offline test fixtures, regression testing, and acceptance verification
+        type: operational
+        status: active
+        spec:
+          - docs/spec/07-testing.md
+        test_roots:
+          - tests/
+
+policies:
+  human_gates:
+    summary: Explicit human gate approval for security, credentials, and contract changes
+    spec:
+      - docs/spec/00-context.md
+  secrets_protection:
+    summary: Prohibition of secrets, tokens, or credentials in fixtures, logs, and commits
+    spec:
+      - docs/spec/07-testing.md
