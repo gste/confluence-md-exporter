@@ -54,7 +54,7 @@ def test_exit_2_when_input_file_missing(tmp_path: Path) -> None:
     export.assert_not_called()
 
 
-def test_exit_2_on_http_401_before_pages(tmp_path: Path) -> None:
+def test_exit_2_on_http_401_before_pages(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
     export = Mock()
     transport_calls: list[str] = []
 
@@ -75,6 +75,79 @@ def test_exit_2_on_http_401_before_pages(tmp_path: Path) -> None:
     export.assert_not_called()
     assert transport_calls
     assert all("/wiki/" not in url for url in transport_calls)
+    err = capsys.readouterr().err
+    assert "401" in err
+    assert "dummy-token" not in err
+    assert "Authorization" not in err
+
+
+def test_exit_2_on_http_404_before_pages(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    export = Mock()
+
+    def auth_probe(settings) -> None:
+        def transport(url: str, headers: dict[str, str]) -> HttpResponse:
+            return HttpResponse(404, b"<html>not found</html>", {"Content-Type": "text/html"})
+
+        ConfluenceClient(settings, transport=transport, sleep=lambda _d: None).probe()
+
+    code = main(
+        argv=[],
+        environ=_env(tmp_path),
+        run_export=export,
+        auth_probe=auth_probe,
+    )
+    assert code == 2
+    export.assert_not_called()
+    err = capsys.readouterr().err
+    assert "404" in err
+    assert "dummy-token" not in err
+    assert "Authorization" not in err
+
+
+def test_exit_2_on_non_json_200_before_pages(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    export = Mock()
+
+    def auth_probe(settings) -> None:
+        def transport(url: str, headers: dict[str, str]) -> HttpResponse:
+            return HttpResponse(200, b"<html>login</html>", {"Content-Type": "text/html"})
+
+        ConfluenceClient(settings, transport=transport, sleep=lambda _d: None).probe()
+
+    code = main(
+        argv=[],
+        environ=_env(tmp_path),
+        run_export=export,
+        auth_probe=auth_probe,
+    )
+    assert code == 2
+    export.assert_not_called()
+    err = capsys.readouterr().err
+    assert "JSON" in err
+    assert "dummy-token" not in err
+    assert "Authorization" not in err
+
+
+def test_auth_probe_passes_on_current_user_json(tmp_path: Path) -> None:
+    export = Mock(return_value=0)
+
+    def auth_probe(settings) -> None:
+        def transport(url: str, headers: dict[str, str]) -> HttpResponse:
+            return HttpResponse(
+                200,
+                json.dumps({"username": "jdoe", "userKey": "abc"}).encode("utf-8"),
+                {},
+            )
+
+        ConfluenceClient(settings, transport=transport, sleep=lambda _d: None).probe()
+
+    code = main(
+        argv=[],
+        environ=_env(tmp_path),
+        run_export=export,
+        auth_probe=auth_probe,
+    )
+    assert code == 0
+    export.assert_called_once()
 
 
 def test_cli_has_no_out_of_scope_flags() -> None:
