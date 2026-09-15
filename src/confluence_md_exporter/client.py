@@ -5,6 +5,7 @@ from __future__ import annotations
 import base64
 import html
 import json
+import logging
 import ssl
 import urllib.error
 import urllib.parse
@@ -17,6 +18,8 @@ from urllib.parse import urlparse
 from confluence_md_exporter.output import EDITION, build_source_url
 from confluence_md_exporter.settings import AuthError, ConfigError, Settings
 from confluence_md_exporter.url_resolver import AcceptedEntry
+
+logger = logging.getLogger(__name__)
 
 RETRY_STATUSES = frozenset({429, 502, 503, 504})
 EXPAND = "body.storage,version,space,history,metadata.labels,ancestors"
@@ -61,15 +64,22 @@ class ConfluenceClient:
         self._transport = transport or self._urllib_get
 
     def probe(self) -> None:
-        response = self._request(self._url(PROBE_PATH))
+        probe_url = self._url(PROBE_PATH)
+        logger.debug("Executing auth probe against %s", probe_url)
+        response = self._request(probe_url)
         reason = _probe_failure_reason(response)
         if reason is not None:
+            logger.debug("Auth probe failed: %s (status %d)", reason, response.status)
             raise AuthError(reason)
+        logger.debug("Auth probe succeeded (status %d)", response.status)
 
     def fetch_version(self, page_id: str) -> int | None:
         query = urllib.parse.urlencode({"expand": "version"})
-        response = self._request(self._url(f"/rest/api/content/{page_id}?{query}"))
+        url = self._url(f"/rest/api/content/{page_id}?{query}")
+        logger.debug("Fetching page version for id=%s from %s", page_id, url)
+        response = self._request(url)
         if response.status >= 400:
+            logger.debug("Fetch version for page_id=%s failed with HTTP %d", page_id, response.status)
             return None
         payload = response.json()
         if not isinstance(payload, dict):
@@ -78,18 +88,22 @@ class ConfluenceClient:
         if number is None:
             return None
         try:
-            return int(number)
+            ver = int(number)
+            logger.debug("Fetched version for page_id=%s: %d", page_id, ver)
+            return ver
         except (TypeError, ValueError):
             return None
 
     def fetch_page_version(self, page_id: str, version: int) -> PageFetchResult:
         try:
+            logger.debug("Fetching specific page version id=%s version=%d", page_id, version)
             query = urllib.parse.urlencode({"version": version, "status": "historical", "expand": EXPAND})
             response = self._request(self._url(f"/rest/api/content/{page_id}?{query}"))
             if response.status == 200:
                 payload = response.json()
                 if isinstance(payload, dict) and payload.get("id"):
                     raw = _to_bronze(self._settings, payload, [])
+                    logger.debug("Successfully fetched historical page id=%s version=%d", page_id, version)
                     return PageFetchResult("ok", None, raw["page_id"], raw["space_key"], raw["title"], raw)
 
             query_ver = urllib.parse.urlencode({
@@ -108,15 +122,19 @@ class ConfluenceClient:
                             "by": payload_ver.get("by"),
                         })
                         raw = _to_bronze(self._settings, content, [])
+                        logger.debug("Successfully fetched historical version via /version/ endpoint id=%s version=%d", page_id, version)
                         return PageFetchResult("ok", None, raw["page_id"], raw["space_key"], raw["title"], raw)
 
             # Check if current version matches requested version
             current = self._fetch_by_id(page_id)
             if current.status == "ok" and current.raw and int(current.raw.get("version") or 0) == version:
+                logger.debug("Current version for page id=%s matches requested version=%d", page_id, version)
                 return current
 
+            logger.debug("Page id=%s version=%d not found", page_id, version)
             return PageFetchResult("failed", f"version_{version}_not_found", page_id, None, None, None)
         except Exception as exc:
+            logger.debug("Exception fetching page id=%s version=%d: %s", page_id, version, exc)
             return PageFetchResult("failed", str(exc), page_id, None, None, None)
 
     def fetch_entry(self, entry: AcceptedEntry) -> PageFetchResult:
@@ -126,6 +144,7 @@ class ConfluenceClient:
             assert entry.page_id is not None
             return self._fetch_by_id(entry.page_id)
         except Exception as exc:
+            logger.debug("Exception fetching page %s: %s", entry.raw, exc)
             return PageFetchResult(
                 status="failed",
                 error=str(exc),
@@ -142,36 +161,49 @@ class ConfluenceClient:
         space = entry.space_key or ""
         title = entry.title or ""
         query = urllib.parse.urlencode({"spaceKey": space, "title": title, "type": "page"})
-        response = self._request(self._url(f"/rest/api/content?{query}"))
+        url = self._url(f"/rest/api/content?{query}")
+        logger.debug("Fetching page by title space=%s title=%r from %s", space, title, url)
+        response = self._request(url)
         if response.status == 403:
+            logger.debug("Forbidden accessing display page %s/%s", space, title)
             return PageFetchResult("failed", "forbidden", None, space, title, None)
         if response.status in {401, 404}:
             error = "unauthorized" if response.status == 401 else "not_found"
             status = "failed" if response.status == 401 else "skipped"
+            logger.debug("Display page %s/%s returned HTTP %d (%s)", space, title, response.status, error)
             return PageFetchResult(status, error, None, space, title, None)
         payload = response.json() or {}
         results = payload.get("results") or []
         if not results:
+            logger.debug("Display page %s/%s returned no results", space, title)
             return PageFetchResult("skipped", "not_found", None, space, title, None)
         found_id = str(results[0]["id"])
+        logger.debug("Resolved display page %s/%s to id=%s", space, title, found_id)
         return self._fetch_by_id(found_id)
 
     def _fetch_by_id(self, page_id: str) -> PageFetchResult:
         query = urllib.parse.urlencode({"expand": EXPAND})
-        response = self._request(self._url(f"/rest/api/content/{page_id}?{query}"))
+        url = self._url(f"/rest/api/content/{page_id}?{query}")
+        logger.debug("Fetching page content id=%s from %s", page_id, url)
+        response = self._request(url)
         if response.status == 403:
+            logger.debug("Forbidden fetching page id=%s", page_id)
             return PageFetchResult("failed", "forbidden", page_id, None, None, None)
         if response.status == 401:
+            logger.debug("Unauthorized fetching page id=%s", page_id)
             return PageFetchResult("failed", "unauthorized", page_id, None, None, None)
         if response.status == 404:
+            logger.debug("Not found page id=%s", page_id)
             return PageFetchResult("skipped", "not_found", page_id, None, None, None)
         payload = response.json()
         if not isinstance(payload, dict):
             return PageFetchResult("failed", "invalid_json", page_id, None, None, None)
         status = str(payload.get("status") or "")
         if status == "trashed":
+            logger.debug("Page id=%s is trashed, skipping", page_id)
             return PageFetchResult("skipped", "trashed", page_id, None, None, None)
         if payload.get("type") != "page":
+            logger.debug("Page id=%s has unsupported type %s", page_id, payload.get("type"))
             return PageFetchResult(
                 "failed",
                 "unsupported_content_type",
@@ -182,20 +214,24 @@ class ConfluenceClient:
             )
         attachments = self._list_attachments(page_id)
         raw = _to_bronze(self._settings, payload, attachments)
+        logger.debug("Successfully fetched page id=%s title=%r (version=%s, %d attachment(s))", page_id, raw["title"], raw["version"], len(attachments))
         return PageFetchResult("ok", None, raw["page_id"], raw["space_key"], raw["title"], raw)
 
     def _list_attachments(self, page_id: str) -> list[dict[str, Any]]:
         items: list[dict[str, Any]] = []
         url = self._url(f"/rest/api/content/{page_id}/child/attachment")
+        logger.debug("Listing attachments for page id=%s from %s", page_id, url)
         while url:
             response = self._request(url)
             if response.status >= 400:
+                logger.debug("Failed listing attachments from %s: HTTP %d", url, response.status)
                 break
             payload = response.json() or {}
             for item in payload.get("results") or []:
                 items.append(_attachment_meta(item))
             next_link = (payload.get("_links") or {}).get("next")
             url = self._absolute(next_link) if next_link else ""
+        logger.debug("Total attachments found for page id=%s: %d", page_id, len(items))
         return items
 
     def _request(self, url: str, *, accept: str = "application/json") -> HttpResponse:
@@ -203,10 +239,14 @@ class ConfluenceClient:
         attempts = 1 + self._settings.confluence_max_retries
         last: HttpResponse | None = None
         for attempt in range(attempts):
+            logger.debug("HTTP GET %s (attempt %d/%d)", url, attempt + 1, attempts)
             last = self._transport(url, headers)
+            logger.debug("HTTP %d %s (size=%d bytes)", last.status, url, len(last.body))
             if last.status not in RETRY_STATUSES or attempt >= attempts - 1:
                 return last
-            self._sleep(_retry_delay(last.headers, attempt))
+            delay = _retry_delay(last.headers, attempt)
+            logger.debug("HTTP status %d is retriable; backing off for %.2fs", last.status, delay)
+            self._sleep(delay)
         assert last is not None
         return last
 
@@ -218,6 +258,7 @@ class ConfluenceClient:
         return self._url(f"/rest/api/content/{attachment_id}")
 
     def download(self, url: str) -> HttpResponse:
+        logger.debug("Downloading attachment binary from %s", url)
         return self._request(url, accept="*/*")
 
     def _headers(self, *, accept: str = "application/json") -> dict[str, str]:
@@ -293,7 +334,6 @@ def _retry_delay(headers: Mapping[str, str], attempt: int) -> float:
 
 def _default_sleep(seconds: float) -> None:
     import time
-
     time.sleep(seconds)
 
 
