@@ -46,7 +46,9 @@ def load_settings(
     force_refresh: bool | None = None,
     base_url: str | None = None,
     username: str | None = None,
+    password: str | None = None,
     token: str | None = None,
+    log_level: str | None = None,
 ) -> Settings:
     edition = _optional(environ, "CONFLUENCE_EDITION", ALLOWED_EDITION)
     if edition != ALLOWED_EDITION:
@@ -54,13 +56,39 @@ def load_settings(
 
     token_value = _first(token, environ.get("CONFLUENCE_TOKEN"))
     username_value = _first(username, environ.get("CONFLUENCE_USERNAME"))
-    auth_type = _resolve_auth_type(environ.get("CONFLUENCE_AUTH_TYPE"), username_value, token_value)
-    if auth_type == "basic" and username_value is None:
-        raise ConfigError("CONFLUENCE_USERNAME is required when CONFLUENCE_AUTH_TYPE is 'basic'")
-    if auth_type in {"basic", "bearer"} and not token_value:
-        raise ConfigError("CONFLUENCE_TOKEN is required when authentication is not anonymous")
-    if username_value is not None and not token_value:
-        raise ConfigError("CONFLUENCE_TOKEN is required when a username is set")
+    password_value = _first(password, environ.get("CONFLUENCE_PASSWORD"))
+
+    if username_value and token_value:
+        raise ConfigError(
+            "Both username (-u/--username) and token (-t/--token) were provided. "
+            "Personal Access Tokens (-t) do not require a username; "
+            "if using Basic Auth, pass password with -p/--password instead."
+        )
+
+    if username_value and not password_value:
+        raise ConfigError(
+            "Password (-p/--password or CONFLUENCE_PASSWORD) is required when username is provided."
+        )
+
+    auth_type = _resolve_auth_type(
+        environ.get("CONFLUENCE_AUTH_TYPE"),
+        username=username_value,
+        password=password_value,
+        token=token_value,
+    )
+
+    if auth_type == "basic":
+        if not username_value:
+            raise ConfigError("CONFLUENCE_USERNAME is required when CONFLUENCE_AUTH_TYPE is 'basic'")
+        if not password_value:
+            raise ConfigError("CONFLUENCE_PASSWORD is required when CONFLUENCE_AUTH_TYPE is 'basic'")
+        secret_value = password_value
+    elif auth_type == "bearer":
+        if not token_value:
+            raise ConfigError("CONFLUENCE_TOKEN is required when CONFLUENCE_AUTH_TYPE is 'bearer'")
+        secret_value = token_value
+    else:
+        secret_value = ""
 
     verify_ssl = _boolean(environ, "CONFLUENCE_VERIFY_SSL", default=True)
     timeout_seconds = _int(environ, "CONFLUENCE_TIMEOUT_SECONDS", default=30, minimum=1)
@@ -77,10 +105,12 @@ def load_settings(
     else:
         export_force = force_refresh
 
-    log_level = _optional(environ, "LOG_LEVEL", "INFO").upper()
-    if log_level == "WARN":
-        log_level = "WARNING"
-    if log_level not in ALLOWED_LOG_LEVELS:
+    resolved_log_level = _first(log_level, environ.get("LOG_LEVEL"), "INFO")
+    assert resolved_log_level is not None
+    resolved_log_level = resolved_log_level.upper()
+    if resolved_log_level == "WARN":
+        resolved_log_level = "WARNING"
+    if resolved_log_level not in ALLOWED_LOG_LEVELS:
         raise ConfigError("LOG_LEVEL is not a recognised logging level")
 
     input_path = Path(export_input)
@@ -99,7 +129,7 @@ def load_settings(
         confluence_base_url=resolved_base,
         confluence_edition=ALLOWED_EDITION,
         confluence_auth_type=auth_type,
-        confluence_token=token_value or "",
+        confluence_token=secret_value,
         confluence_username=username_value,
         confluence_verify_ssl=verify_ssl,
         confluence_timeout_seconds=timeout_seconds,
@@ -107,7 +137,7 @@ def load_settings(
         export_output_dir=export_output,
         export_input_file=export_input,
         export_force_refresh=export_force,
-        log_level=log_level,
+        log_level=resolved_log_level,
     )
 
 
@@ -121,13 +151,19 @@ def _first(*values: str | None) -> str | None:
     return None
 
 
-def _resolve_auth_type(explicit: str | None, username: str | None, token: str | None) -> str:
+def _resolve_auth_type(
+    explicit: str | None,
+    *,
+    username: str | None,
+    password: str | None,
+    token: str | None,
+) -> str:
     if explicit is not None and str(explicit).strip():
         auth_type = str(explicit).strip().lower()
         if auth_type not in ALLOWED_AUTH_TYPES:
             raise ConfigError("CONFLUENCE_AUTH_TYPE must be 'anonymous', 'basic' or 'bearer'")
         return auth_type
-    if token and username:
+    if username and password:
         return "basic"
     if token:
         return "bearer"
@@ -161,25 +197,20 @@ def _int(environ: Mapping[str, str], key: str, *, default: int, minimum: int) ->
     try:
         parsed = int(raw)
     except ValueError as exc:
-        raise ConfigError(f"{key} must be an integer") from exc
+        raise ConfigError(f"{key} must be an integer, got {raw!r}") from exc
     if parsed < minimum:
-        raise ConfigError(f"{key} must be >= {minimum}")
+        raise ConfigError(f"{key} must be at least {minimum}, got {parsed}")
     return parsed
 
 
-def _normalize_base_url(raw: str) -> str:
-    parsed = urlparse(raw.strip())
-    if parsed.scheme not in {"http", "https"} or not parsed.hostname:
-        raise ConfigError(
-            "CONFLUENCE_BASE_URL must be a URL (scheme + host + optional port and context path)"
-        )
-    if parsed.params or parsed.query or parsed.fragment:
-        raise ConfigError("CONFLUENCE_BASE_URL must not include a query or fragment")
-    if parsed.username or parsed.password:
-        raise ConfigError("CONFLUENCE_BASE_URL must not include credentials")
+def _normalize_base_url(value: str) -> str:
+    stripped = value.strip().rstrip("/")
+    parsed = urlparse(stripped)
+    if parsed.scheme not in {"http", "https"}:
+        raise ConfigError(f"CONFLUENCE_BASE_URL scheme must be http or https, got {stripped!r}")
+    if not parsed.netloc:
+        raise ConfigError(f"CONFLUENCE_BASE_URL host is missing in {stripped!r}")
     path = parsed.path or ""
-    if path.endswith("/"):
-        path = path.rstrip("/")
-    if "wiki" in {segment for segment in path.split("/") if segment}:
-        raise ConfigError("CONFLUENCE_BASE_URL must not include /wiki")
-    return f"{parsed.scheme}://{parsed.netloc}{path}"
+    if path == "/wiki" or path.startswith("/wiki/") or "/wiki" in path.split("/"):
+        raise ConfigError(f"CONFLUENCE_BASE_URL must not contain /wiki: {stripped!r}")
+    return stripped
