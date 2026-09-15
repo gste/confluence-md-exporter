@@ -4,7 +4,7 @@
 
 Local read-only export of **Confluence Server/Data Center** pages to Markdown: page body, attachments, version diffs, and a batch report.
 
-It does not write to Confluence, walk descendants, or talk to Cloud. Python `>=3.11,<3.14`.
+It does not write to Confluence, walk descendants, or talk to Cloud. Python `>=3.11,<3.15`.
 
 ## Install
 
