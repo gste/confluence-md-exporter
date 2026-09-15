@@ -1,6 +1,6 @@
 [project]
 name = "confluence-md-exporter"
-version = "1.0.0"
+dynamic = ["version"]
 description = "Local read-only export of Confluence Server/Data Center pages to Markdown"
 readme = "README.md"
 license = "MIT"
@@ -38,8 +38,17 @@ Changelog = "https://github.com/gste/confluence-md-exporter/blob/master/CHANGELO
 confluence-md-exporter = "confluence_md_exporter.cli:entry"
 
 [build-system]
-requires = ["hatchling"]
+requires = ["hatchling", "hatch-vcs"]
 build-backend = "hatchling.build"
+
+[tool.hatch.version]
+source = "vcs"
+
+[tool.hatch.version.raw-options]
+local_scheme = "no-local-version"
+
+[tool.hatch.build.hooks.vcs]
+version-file = "src/confluence_md_exporter/_version.py"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/confluence_md_exporter"]

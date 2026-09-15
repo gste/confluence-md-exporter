@@ -16,7 +16,7 @@ wheels = [
 
 [[package]]
 name = "confluence-md-exporter"
-version = "1.0.0"
+version = "1.0.1.dev3"
 source = { editable = "." }
 
 [package.dev-dependencies]

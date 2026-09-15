@@ -18,11 +18,42 @@ from confluence_md_exporter.settings import ConfigError, Settings, load_settings
 ExportFn = Callable[[Settings], int | None]
 AuthProbe = Callable[[Settings], None]
 
+_HELP_EPILOG = """\
+Defaults: input/urls.txt, output/, anonymous access.
+The Confluence base URL is inferred from absolute URLs in the list.
 
-def parse_cli(argv: Sequence[str] | None = None) -> argparse.Namespace:
+Examples:
+  confluence-md-exporter -i urls.txt -o output
+      public instance, full page URLs in the list
+
+  confluence-md-exporter -i urls.txt -o output -t PAT
+      private instance, Personal Access Token (Bearer)
+
+  confluence-md-exporter -i urls.txt -o output -u USER -t TOKEN
+      private instance, HTTP Basic (username + PAT/password)
+
+  confluence-md-exporter -i ids.txt -o output --base-url https://confluence.example.com
+      page ids only, base URL set explicitly
+
+  confluence-md-exporter -i urls.txt -o output -c
+      wipe the output directory and export from scratch
+
+  confluence-md-exporter -i urls.txt -o output -r
+      do not skip pages whose version is already on disk
+
+Exit codes: 0 ok/skipped; 1 some pages failed; 2 config, auth, or missing input file.
+"""
+
+
+def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="confluence-md-exporter",
-        description="Export Confluence Server/Data Center pages to Markdown.",
+        description=(
+            "Local read-only export of Confluence Server/Data Center pages "
+            "to Markdown, attachments, and version diffs."
+        ),
+        epilog=_HELP_EPILOG,
+        formatter_class=argparse.RawDescriptionHelpFormatter,
     )
     parser.add_argument(
         "--version",
@@ -33,15 +64,17 @@ def parse_cli(argv: Sequence[str] | None = None) -> argparse.Namespace:
         "-i",
         "--input",
         dest="input",
+        metavar="FILE",
         default=None,
-        help="Path to the URL list (overrides EXPORT_INPUT_FILE)",
+        help="URL list (default: input/urls.txt)",
     )
     parser.add_argument(
         "-o",
         "--output",
         dest="output",
+        metavar="DIR",
         default=None,
-        help="Output root (overrides EXPORT_OUTPUT_DIR)",
+        help="output directory (default: output)",
     )
     parser.add_argument(
         "-r",
@@ -50,7 +83,7 @@ def parse_cli(argv: Sequence[str] | None = None) -> argparse.Namespace:
         dest="force_refresh",
         action="store_true",
         default=None,
-        help="Ignore disk-skip and refresh cached content (overrides EXPORT_FORCE_REFRESH=true)",
+        help="ignore disk-skip and re-fetch pages",
     )
     parser.add_argument(
         "-c",
@@ -58,28 +91,31 @@ def parse_cli(argv: Sequence[str] | None = None) -> argparse.Namespace:
         dest="clean",
         action="store_true",
         default=False,
-        help="Clean output directory before export",
+        help="wipe the output directory before export",
     )
     parser.add_argument(
         "-u",
         "--user",
         "--username",
         dest="username",
+        metavar="USER",
         default=None,
-        help="Confluence username (with --token uses HTTP Basic)",
+        help="username; with -t uses HTTP Basic",
     )
     parser.add_argument(
         "-t",
         "--token",
         dest="token",
+        metavar="TOKEN",
         default=None,
-        help="Personal Access Token or password",
+        help="Personal Access Token or password; -t alone uses Bearer",
     )
     parser.add_argument(
         "--base-url",
         dest="base_url",
+        metavar="URL",
         default=None,
-        help="Confluence base URL (otherwise inferred from input URLs)",
+        help="instance base URL if it cannot be inferred from the list",
     )
     parser.add_argument(
         "-s",
@@ -87,9 +123,13 @@ def parse_cli(argv: Sequence[str] | None = None) -> argparse.Namespace:
         dest="simple",
         action="store_true",
         default=False,
-        help="Ignored: export is always single-threaded",
+        help=argparse.SUPPRESS,
     )
-    return parser.parse_args(list(argv) if argv is not None else None)
+    return parser
+
+
+def parse_cli(argv: Sequence[str] | None = None) -> argparse.Namespace:
+    return build_parser().parse_args(list(argv) if argv is not None else None)
 
 
 def configure_logging(level: str) -> None:
