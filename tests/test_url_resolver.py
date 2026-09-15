@@ -5,7 +5,7 @@ from pathlib import Path
 import pytest
 
 from confluence_md_exporter.settings import ConfigError
-from confluence_md_exporter.url_resolver import resolve_input_file
+from confluence_md_exporter.url_resolver import InvalidUrl, resolve_input_file
 
 BASE = "https://confluence.example.com"
 
@@ -72,23 +72,42 @@ def test_relative_path_resolved_against_base(tmp_path: Path) -> None:
     assert result.entries[0].page_id == "106"
 
 
-def test_tiny_link_and_foreign_origin_are_invalid(tmp_path: Path) -> None:
-    path = _write(
-        tmp_path,
-        "\n".join(
-            [
-                f"{BASE}/x/AbCdEf",
-                "/x/AbCdEf",
-                "https://other.example.com/pages/viewpage.action?pageId=1",
-                "not-a-url",
-            ]
-        )
-        + "\n",
-    )
-    result = resolve_input_file(path, BASE)
+def test_tiny_link_is_invalid_with_reason(tmp_path: Path, caplog: pytest.LogCaptureFixture) -> None:
+    path = _write(tmp_path, f"{BASE}/x/AbCdEf\n")
+    with caplog.at_level("WARNING"):
+        result = resolve_input_file(path, BASE)
     assert result.pages_total == 0
     assert result.entries == ()
-    assert len(result.invalid_urls) == 4
+    assert result.invalid_urls == (InvalidUrl(url=f"{BASE}/x/AbCdEf", reason="tiny_link"),)
+    assert "tiny_link" in caplog.text
+    assert f"{BASE}/x/AbCdEf" in caplog.text
+
+
+def test_tiny_link_is_not_resolved_to_page_id(tmp_path: Path) -> None:
+    path = _write(tmp_path, f"{BASE}/x/AbCdEf\n/x/AbCdEf\n")
+    result = resolve_input_file(path, BASE)
+    assert all(item.reason == "tiny_link" for item in result.invalid_urls)
+    assert result.entries == ()
+
+
+def test_foreign_origin_is_origin_mismatch(tmp_path: Path) -> None:
+    raw = "https://other.example.com/pages/viewpage.action?pageId=1"
+    path = _write(tmp_path, raw + "\n")
+    result = resolve_input_file(path, BASE)
+    assert result.invalid_urls == (InvalidUrl(url=raw, reason="origin_mismatch"),)
+
+
+def test_viewpage_without_page_id_is_malformed(tmp_path: Path) -> None:
+    raw = f"{BASE}/pages/viewpage.action"
+    path = _write(tmp_path, raw + "\n")
+    result = resolve_input_file(path, BASE)
+    assert result.invalid_urls == (InvalidUrl(url=raw, reason="malformed"),)
+
+
+def test_garbage_line_is_unrecognized_form(tmp_path: Path) -> None:
+    path = _write(tmp_path, "not-a-url\n")
+    result = resolve_input_file(path, BASE)
+    assert result.invalid_urls == (InvalidUrl(url="not-a-url", reason="unrecognized_form"),)
 
 
 def test_duplicates_collapse_with_warning(tmp_path: Path, caplog: pytest.LogCaptureFixture) -> None:
