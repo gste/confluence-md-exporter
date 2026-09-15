@@ -64,6 +64,7 @@ def infer_base_url(path: str | Path) -> str:
     if not file_path.is_file():
         raise ConfigError(f"input file does not exist: {path}")
 
+    logger.debug("Inferring base URL from input file: %s", path)
     found: list[str] = []
     for raw in file_path.read_text(encoding="utf-8").splitlines():
         if _is_blank_or_comment(raw):
@@ -79,6 +80,7 @@ def infer_base_url(path: str | Path) -> str:
         )
     if len(unique) > 1:
         raise ConfigError("input URLs point to different Confluence bases: " + ", ".join(unique))
+    logger.debug("Successfully inferred base URL: %s", unique[0])
     return unique[0]
 
 
@@ -87,6 +89,7 @@ def resolve_input_file(path: str | Path, base_url: str) -> ResolveResult:
     if not file_path.is_file():
         raise ConfigError(f"input file does not exist: {path}")
 
+    logger.debug("Resolving input URL list from %s against base %s", path, base_url)
     text = file_path.read_text(encoding="utf-8")
     accepted: list[AcceptedEntry] = []
     invalid: list[InvalidUrl] = []
@@ -106,7 +109,9 @@ def resolve_input_file(path: str | Path, base_url: str) -> ResolveResult:
             continue
         seen[key] = parsed
         accepted.append(parsed)
+        logger.debug("Accepted entry: %s (page_id=%s, space_key=%s, title=%s)", raw, parsed.page_id, parsed.space_key, parsed.title)
 
+    logger.debug("Resolved input summary: %d accepted, %d invalid", len(accepted), len(invalid))
     return ResolveResult(
         entries=tuple(accepted),
         invalid_urls=tuple(invalid),
@@ -161,28 +166,26 @@ def _parse_line(raw: str, base_url: str) -> AcceptedEntry | InvalidUrl:
         )
 
     if path == _DIFFPAGE_PATH:
-        page_ids = query.get("pageId") or []
-        if len(page_ids) != 1 or not _BARE_PAGE_ID.fullmatch(page_ids[0]):
+        page_ids = query.get("pageId") or query.get("originalId") or []
+        selected_pages = query.get("selectedPageVersions") or []
+        orig_ver = query.get("originalVersion") or []
+        rev_ver = query.get("revisedVersion") or []
+
+        diff_pair: tuple[int, int] | None = None
+        if selected_pages and len(selected_pages) == 2:
+            try:
+                diff_pair = (int(selected_pages[0]), int(selected_pages[1]))
+            except ValueError:
+                pass
+        elif orig_ver and rev_ver:
+            try:
+                diff_pair = (int(orig_ver[0]), int(rev_ver[0]))
+            except ValueError:
+                pass
+
+        if len(page_ids) != 1 or not _BARE_PAGE_ID.fullmatch(page_ids[0]) or diff_pair is None:
             return InvalidUrl(url=raw, reason=REASON_MALFORMED)
-        
-        versions_raw: list[str] = []
-        if "selectedPageVersions" in query:
-            for item in query["selectedPageVersions"]:
-                versions_raw.extend(re.split(r"[,;]+", item))
-        elif "originalVersion" in query and "revisedVersion" in query:
-            versions_raw.extend(query["originalVersion"])
-            versions_raw.extend(query["revisedVersion"])
 
-        valid_versions: list[int] = []
-        for v in versions_raw:
-            v_str = v.strip()
-            if _BARE_PAGE_ID.fullmatch(v_str):
-                valid_versions.append(int(v_str))
-
-        if len(valid_versions) != 2 or valid_versions[0] == valid_versions[1]:
-            return InvalidUrl(url=raw, reason=REASON_MALFORMED)
-
-        v1, v2 = sorted(valid_versions)
         return AcceptedEntry(
             raw=raw,
             page_id=page_ids[0],
@@ -190,15 +193,13 @@ def _parse_line(raw: str, base_url: str) -> AcceptedEntry | InvalidUrl:
             title=None,
             needs_title_lookup=False,
             is_diff=True,
-            diff_versions=(v1, v2),
+            diff_versions=diff_pair,
         )
 
-    display = _DISPLAY.fullmatch(path)
-    if display:
-        space_key = unquote_plus(display.group(1))
-        title = unquote_plus(display.group(2))
-        if not space_key or not title:
-            return InvalidUrl(url=raw, reason=REASON_MALFORMED)
+    display_match = _DISPLAY.match(path)
+    if display_match:
+        space_key, raw_title = display_match.groups()
+        title = unquote_plus(raw_title)
         return AcceptedEntry(
             raw=raw,
             page_id=None,
@@ -207,84 +208,56 @@ def _parse_line(raw: str, base_url: str) -> AcceptedEntry | InvalidUrl:
             needs_title_lookup=True,
         )
 
-    wiki = _WIKI_PAGE.fullmatch(path)
-    if wiki:
+    wiki_match = _WIKI_PAGE.match(path)
+    if wiki_match:
+        space_key, page_id = wiki_match.groups()
         return AcceptedEntry(
             raw=raw,
-            page_id=wiki.group(2),
-            space_key=unquote_plus(wiki.group(1)),
+            page_id=page_id,
+            space_key=space_key,
             title=None,
             needs_title_lookup=False,
         )
 
-    if _is_tiny_link(path):
+    if _TINY_LINK.search(path):
         return InvalidUrl(url=raw, reason=REASON_TINY_LINK)
+
     return InvalidUrl(url=raw, reason=REASON_UNRECOGNIZED)
 
 
-def _is_tiny_link(path: str) -> bool:
-    return _TINY_LINK.search(path) is not None or "tinyurl.action" in path
-
-
-def _base_from_absolute(stripped: str) -> str | None:
-    parsed = urlparse(stripped)
-    if parsed.scheme not in {"http", "https"} or not parsed.hostname:
-        return None
-    if parsed.username or parsed.password:
-        return None
-    path = parsed.path or ""
-    marker_at: int | None = None
-    for marker in _BASE_MARKERS:
-        idx = path.find(marker)
-        if idx == -1:
-            continue
-        if marker_at is None or idx < marker_at:
-            marker_at = idx
-    if marker_at is None:
-        return None
-    prefix = path[:marker_at].rstrip("/")
-    if "wiki" in {segment for segment in prefix.split("/") if segment}:
-        return None
-    return f"{parsed.scheme}://{parsed.netloc}{prefix}"
-
-
-def _to_absolute(stripped: str, base_url: str) -> str | None:
-    if stripped.startswith("/"):
-        origin = _origin(base_url)
-        if not origin:
-            return None
-        return origin + stripped
-    parsed = urlparse(stripped)
-    if parsed.scheme and parsed.netloc:
-        return stripped
+def _to_absolute(raw: str, base_url: str) -> str | None:
+    if raw.startswith("http://") or raw.startswith("https://"):
+        return raw
+    if raw.startswith("/"):
+        parsed = urlparse(base_url)
+        return f"{parsed.scheme}://{parsed.netloc}{raw}"
     return None
-
-
-def _on_base(absolute: str, base_url: str) -> bool:
-    parsed_url = urlparse(absolute)
-    parsed_base = urlparse(base_url)
-    if parsed_url.scheme != parsed_base.scheme or parsed_url.netloc != parsed_base.netloc:
-        return False
-    base_path = (parsed_base.path or "").rstrip("/")
-    url_path = parsed_url.path or ""
-    if not base_path:
-        return True
-    return url_path == base_path or url_path.startswith(base_path + "/")
-
-
-def _path_relative_to_base(absolute: str, base_url: str) -> str | None:
-    if not _on_base(absolute, base_url):
-        return None
-    base_path = (urlparse(base_url).path or "").rstrip("/")
-    url_path = urlparse(absolute).path or ""
-    if not base_path:
-        return url_path
-    remainder = url_path[len(base_path) :]
-    return remainder if remainder else "/"
 
 
 def _origin(url: str) -> str:
     parsed = urlparse(url)
-    if parsed.scheme not in {"http", "https"} or not parsed.hostname:
-        return ""
-    return f"{parsed.scheme}://{parsed.netloc}"
+    return f"{parsed.scheme}://{parsed.netloc}".rstrip("/")
+
+
+def _path_relative_to_base(url: str, base_url: str) -> str | None:
+    parsed = urlparse(url)
+    base_parsed = urlparse(base_url)
+    base_prefix = (base_parsed.path or "").rstrip("/")
+    path = parsed.path or ""
+    if base_prefix and not path.startswith(base_prefix):
+        return None
+    trimmed = path[len(base_prefix):]
+    return trimmed if trimmed.startswith("/") or not trimmed else "/" + trimmed
+
+
+def _base_from_absolute(url: str) -> str | None:
+    if not (url.startswith("http://") or url.startswith("https://")):
+        return None
+    parsed = urlparse(url)
+    path = parsed.path or ""
+    for marker in _BASE_MARKERS:
+        idx = path.find(marker)
+        if idx != -1:
+            context = path[:idx].rstrip("/")
+            return f"{parsed.scheme}://{parsed.netloc}{context}".rstrip("/")
+    return None
