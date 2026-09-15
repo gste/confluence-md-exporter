@@ -12,6 +12,7 @@
 - каждый краевой случай из [05-transform.md#edge-cases](./05-transform.md#edge-cases);
 - disk-skip и `--force-refresh` из [04-fetch.md#disk-skip](./04-fetch.md#disk-skip);
 - сборку `manifest.json` и `run_report.json` из [03-output.md](./03-output.md);
+- коды причины отклонённых URL из [02-input.md#rejection-reasons](./02-input.md#rejection-reasons);
 - коды выхода `0` / `1` / `2` из [01-configuration.md#exit-codes](./01-configuration.md#exit-codes);
 - отказ стартовать при `CONFLUENCE_EDITION`, отличном от `datacenter`;
 - канонические ссылки `../03_assets/...`: каждая такая ссылка в сгенерированном Markdown резолвится в существующий файл.

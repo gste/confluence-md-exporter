@@ -155,12 +155,25 @@ def write_manifest(output_dir: Path, records: Sequence[Mapping[str, Any]]) -> Pa
     return path
 
 
+INVALID_URL_ITEM_KEYS = ("url", "reason")
+
+
 def write_run_report(output_dir: Path, report: Mapping[str, Any]) -> Path:
     payload = dict(report)
     _require_keys(payload, RUN_REPORT_KEYS)
+    _require_invalid_urls(payload["invalid_urls"])
     path = output_dir / run_report_path()
     _write_json(path, payload)
     return path
+
+
+def _require_invalid_urls(items: object) -> None:
+    if not isinstance(items, list):
+        raise ValueError("invalid_urls must be a list")
+    for item in items:
+        if not isinstance(item, Mapping):
+            raise ValueError("invalid_urls item must be an object")
+        _require_keys(item, INVALID_URL_ITEM_KEYS)
 
 
 def _require_keys(data: Mapping[str, Any], keys: Sequence[str]) -> None:

@@ -31,9 +31,26 @@
 
 ## Rejected forms
 
-Любая строка, которая не совпала ни с одной формой выше, — невалидная. В том числе tiny-link `/x/<hash>` и прочие формы вне списка.
+Любая строка, которая не совпала ни с одной формой выше, — невалидная. В том числе tiny-link `/x/<hash>` и прочие формы вне списка. Такой строке назначается ровно один код причины из [rejection-reasons](#rejection-reasons).
 
-Невалидная строка не валит батч: она попадает в `run_report.json` как элемент `invalid_urls` и не входит в `manifest.json`.
+Невалидная строка не валит батч: она попадает в `run_report.json` как элемент `invalid_urls` (объект `{ "url", "reason" }`) и не входит в `manifest.json`.
+
+## Rejection reasons
+
+Код причины стабилен. Строке назначается ровно один код — первое совпавшее правило:
+
+1. Строку нельзя превратить в абсолютный URL (нет схемы `http`/`https` и она не начинается с `/`) — `unrecognized_form`. Голый `pageId` сюда не относится: это принятая форма.
+2. Origin после нормализации не совпадает с `CONFLUENCE_BASE_URL` — `origin_mismatch`.
+3. Путь опознан как семейство допустимой формы, но обязательная часть отсутствует или неверна: у `viewpage.action` нет ровно одного числового `pageId`; у display пустые space или title — `malformed`.
+4. Путь — tiny-link `/x/<hash>` (допускается префикс каталога перед `/x/`) либо содержит `tinyurl.action` — `tiny_link`.
+5. Иное — `unrecognized_form`.
+
+| Код | Смысл |
+|---|---|
+| `tiny_link` | tiny-link; в `page_id` не резолвится |
+| `origin_mismatch` | чужой origin |
+| `malformed` | опознанное семейство формы без обязательной части |
+| `unrecognized_form` | не URL, либо форма вне [accepted-url-forms](#accepted-url-forms) |
 
 ## Deduplication
 
