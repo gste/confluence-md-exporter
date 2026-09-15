@@ -4,7 +4,9 @@
 
 ## REST base
 
-Все API-запросы идут на `CONFLUENCE_BASE_URL` без префикса `/wiki`. Префикс `/wiki` — признак Cloud и в первой версии не используется.
+Все API-запросы идут на `{CONFLUENCE_BASE_URL}/rest/api/...`. База может включать контекст-путь. Префикс `/wiki` в `CONFLUENCE_BASE_URL` — признак Cloud и в первой версии не используется.
+
+Первый запрос к инстансу до обработки страниц — проба идентичности `GET /rest/api/user/current`. Исход — [01-configuration.md#auth-probe](./01-configuration.md#auth-probe).
 
 Авторизация, таймаут, TLS, ретраи и запрет cookie — [01-configuration.md#http-transport](./01-configuration.md#http-transport).
 

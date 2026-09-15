@@ -136,6 +136,20 @@ def test_display_search_empty_is_skipped_with_null_id() -> None:
     assert query["type"] == ["page"]
 
 
+def test_rest_paths_use_application_base() -> None:
+    transport = ScriptedTransport([_json(200, _page_payload()), _json(200, _attachments())])
+    client = ConfluenceClient(
+        _settings(confluence_base_url="https://confluence.example.com/confluence"),
+        transport=transport,
+        sleep=lambda _d: None,
+    )
+    result = client.fetch_entry(AcceptedEntry("10", "10", None, None, False))
+    assert result.status == "ok"
+    parsed = urlparse(transport.calls[0][0])
+    assert parsed.path == "/confluence/rest/api/content/10"
+    assert "/wiki/" not in parsed.path
+
+
 def test_page_error_does_not_stop_the_batch() -> None:
     transport = ScriptedTransport(
         [

@@ -38,6 +38,7 @@
    Change type не выдаёт полномочий: если тип требует другой роли — останавливаешься.
    Тип adr+spec проходит через несколько ролей и сессий (Planner -> человек принимает ADR
    -> Spec editor -> Implementer); одна сессия закрывает один шаг.
+   Работа 05-fix-bug новой роли не создаёт: роль сессии меняется после human gate.
 
 2. ЗАКОН
    Init Requirements + ADR -> Specification (docs/spec/) -> Atomic tasks (docs/todo/) -> Implementation.
@@ -58,16 +59,18 @@
    в docs/process/prompts/, который ты открываешь ДОПОЛНИТЕЛЬНО к этому ядру:
      docs/init/ пуст или продукт в нём не описан    -> 01-init-requirements.md (Init author)
      stage=bootstrap, docs/init/** заполнен          -> 02-init-to-spec.md      (Spec editor)
-     stage=spec-first, файла задачи нет              -> 03-spec-to-epic.md      (Planner)
-     stage=spec-first, есть файл задачи в docs/todo/ -> 04-implement-task.md    (Implementer)
+     stage=spec-first, файла нет под нужную работу   -> 03-spec-to-epic.md      (Planner)
+     stage=spec-first, файл в docs/todo/<epic>/task/ -> 04-implement-task.md    (Implementer)
+     stage=spec-first, файл в docs/todo/<epic>/bug/
+       или наблюдение бага                           -> 05-fix-bug.md
    Подходят две записи или ни одна — стоп и вопрос, работу не выбираешь молча.
    Реестр работ: docs/process/prompts/README.md. Job-промпт не повторяет это ядро:
    в нём только процедура своего артефакта.
 
 4. ЧТЕНИЕ (минимальный контекст, не грузить пакет целиком)
-   Implementer: AGENTS.md -> workflow.md -> roles.md -> файл задачи в docs/todo/<epic>/
+   Implementer: AGENTS.md -> workflow.md -> roles.md -> файл в docs/todo/<epic>/task/
                 -> docs/spec/README.md -> только секции, на которые ссылается задача.
-                Файла задачи нет — ты не Implementer: либо Planner, либо стоп с вопросом.
+                Файла в task/ нет — ты не Implementer: Planner, fix-bug, либо стоп.
    Planner/Auditor/Spec editor: AGENTS.md + docs/process/** -> docs/spec/README.md
                 -> relevant ADR в docs/decisions/ -> дифф или черновик под ревью.
    Весь пакет спеки читается только если задача явно охватывает несколько модулей.
@@ -91,13 +94,17 @@
                  только человек; затем Spec delta и императивное отражение решения
                  в объявленных якорях docs/spec/** (без «см. варианты в ADR»); затем код.
    epic        : предпосылка — нужные секции спеки смерджены, открытые развилки закрыты
-                 принятыми ADR; создаёшь docs/todo/<epic-id>/README.md и задачи 01-….md;
-                 один таск — один PR; после последнего мерджа docs/todo/<epic-id>/ удаляется.
+                 принятыми ADR; создаёшь docs/todo/<epic-id>/README.md и файлы
+                 task/NN-<slug>.md / bug/NN-<slug>.md; один слайс — один PR;
+                 закрытый файл удаляется в том PR; пустой эпик сносится.
 
 7. КОНТРАКТ ФАЙЛА ЗАДАЧИ (docs/todo/)
-   Обязательно: цель в 1-3 предложениях; ссылки на docs/spec/ с якорями;
+   Обязательно: kind (task | bug); цель в 1-3 предложениях; ссылки на docs/spec/ с якорями;
    in scope / out of scope; Definition of Done (поведение, тесты, файлы);
    разрешены ли правки спеки (по умолчанию — нет).
+   Inbox: docs/todo/<epic>/task/ или .../bug/; имя NN-<slug>.md; каталог = kind.
+   Ветка: task -> feature/<slug>, bug -> bugfix/<slug>.
+   Для bug ещё opened (YYYY-MM-DD); опциональный Run без секретов.
    Запрещено: копировать требования из спеки, приводить альтернативные варианты дизайна.
 
 8. ЖЁСТКИЕ ЗАПРЕТЫ (AGENTS.md, roles.md)
@@ -123,8 +130,8 @@
    Соответствие docs/spec/** (или тип trivial); тесты из задачи и из testing-секции спеки
    зелёные; секретов в логах, фикстурах и коммитах нет; PR цитирует пути docs/spec/...
    при изменении поведения; при правках спеки git diff -- docs/spec/ является подмножеством
-   объявленной Spec delta; human gates для типа изменения пройдены; docs/todo/<epic>/
-   очищен, если это был последний таск эпика.
+   объявленной Spec delta; human gates для типа изменения пройдены; закрытый файл
+   очереди удалён в PR; docs/todo/<epic>/ снесён, если слайсов не осталось.
 ```
 
 ## Repo-local addendum (заменяется при копировании)
@@ -133,6 +140,8 @@
 11. ЯЗЫК АРТЕФАКТОВ
    Проза docs/process/**, docs/spec/**, docs/init/**, docs/todo/**
    и тела PR — русский язык: это читает и держит в голове RU-команда.
+   Ответы человеку в чате — русский, включая итог implement-task и fix-bug.
+   Исключение: человек в этом ходе пишет по-английски — тогда ответ на EN.
    AGENTS.md и .cursor/skills/** — английский: их читают в основном агенты.
    Всегда по-английски, независимо от языка прозы: имена файлов, заголовки и якоря,
    requirement ID, идентификаторы кода и имена терминов процесса (Spec delta, stage,

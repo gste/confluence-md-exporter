@@ -75,8 +75,16 @@ def test_verify_ssl_unrecognised_rejected(tmp_path: Path) -> None:
         load_settings(_env(tmp_path, CONFLUENCE_VERIFY_SSL="maybe"))
 
 
-def test_base_url_rejects_wiki_suffix_and_trailing_slash(tmp_path: Path) -> None:
+def test_base_url_rejects_wiki_and_accepts_context_path(tmp_path: Path) -> None:
     with pytest.raises(ConfigError, match="CONFLUENCE_BASE_URL"):
         load_settings(_env(tmp_path, CONFLUENCE_BASE_URL="https://confluence.example.com/wiki"))
     with pytest.raises(ConfigError, match="CONFLUENCE_BASE_URL"):
-        load_settings(_env(tmp_path, CONFLUENCE_BASE_URL="https://confluence.example.com/"))
+        load_settings(_env(tmp_path, CONFLUENCE_BASE_URL="https://confluence.example.com/wiki/foo"))
+    settings = load_settings(
+        _env(tmp_path, CONFLUENCE_BASE_URL="https://confluence.example.com/confluence/")
+    )
+    assert settings.confluence_base_url == "https://confluence.example.com/confluence"
+    stripped = load_settings(
+        _env(tmp_path, CONFLUENCE_BASE_URL="https://confluence.example.com/")
+    )
+    assert stripped.confluence_base_url == "https://confluence.example.com"

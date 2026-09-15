@@ -1,6 +1,6 @@
 ---
 name: implement-task
-description: Implements exactly one task file from docs/todo/ with its tests and opens a PR that cites the specification. Use when a task file exists and the work is coding, test writing, or a spec-patch limited to a declared Spec delta.
+description: Implements exactly one task file from docs/todo/<epic>/task/ with its tests and opens a PR that cites the specification. Use when kind is task. Do not use for docs/todo/<epic>/bug/ or kind: bug (that is fix-bug).
 disable-model-invocation: true
 ---
 
@@ -10,6 +10,6 @@ This skill carries no rules of its own. The repository files are the source of t
 
 1. Read `docs/process/agent-prompt.md` and follow its core prompt.
 2. Read `docs/process/prompts/04-implement-task.md` and follow it as the procedure for this job.
-3. Read the given task file, then only the spec anchors it lists.
+3. Read the given file under `docs/todo/<epic>/task/`, then only the spec anchors it lists.
 
-No task file means this is the wrong job: plan it first or stop and ask. Do not merge or push to the default branch.
+A path under `bug/` or `kind: bug` is the wrong job: stop and point to `/fix-bug`. No task file means plan it first or stop and ask. Do not merge or push to the default branch.
