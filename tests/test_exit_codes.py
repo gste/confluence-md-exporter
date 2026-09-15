@@ -34,13 +34,10 @@ def _env(tmp_path: Path, **overrides: str) -> dict[str, str]:
 
 
 def test_version_flag(capsys: pytest.CaptureFixture[str]) -> None:
-    from confluence_md_exporter import __version__
-
     with pytest.raises(SystemExit) as exc:
         parse_cli(["--version"])
     assert exc.value.code == 0
-    assert __version__ in capsys.readouterr().out
-    assert __version__.startswith("1.0.1")
+    assert "1.0.1" in capsys.readouterr().out
 
 
 def test_help_describes_defaults_examples_and_hides_simple() -> None:

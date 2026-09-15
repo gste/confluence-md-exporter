@@ -39,4 +39,3 @@ coverage.xml
 *.egg-info/
 dist/
 build/
-src/confluence_md_exporter/_version.py
