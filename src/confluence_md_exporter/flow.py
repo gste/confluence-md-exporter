@@ -58,7 +58,9 @@ def run_export(
     started = _now()
     started_mono = time.monotonic()
     output_dir = Path(settings.export_output_dir)
+    logger.debug("Starting export run. Output directory: %s, Clean: %s", output_dir, clean)
     if clean and output_dir.exists():
+        logger.debug("Wiping output directory %s before export", output_dir)
         shutil.rmtree(output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
 
@@ -74,19 +76,23 @@ def run_export(
         settings.export_output_dir,
         ", force-refresh" if settings.export_force_refresh else "",
     )
+    logger.debug("Resolved %d page entries for processing", total)
 
     fetches = _fetch_all(http, output_dir, resolved.entries, settings)
     batch_pages = _batch_pages(fetches)
     outcomes: list[PageOutcome] = []
     for index, (entry, fetch) in enumerate(zip(resolved.entries, fetches), start=1):
         if entry.is_diff and entry.diff_versions:
+            logger.debug("[%s/%s] Processing diff page: %s", index, total, entry.raw)
             outcome = _finish_diff_page(output_dir, settings, http, entry, publisher)
         else:
+            logger.debug("[%s/%s] Processing page: %s", index, total, _entry_ref(entry))
             outcome = _finish_page(output_dir, settings, fetch, batch_pages, publisher)
         logger.info("[%s/%s] write %s -> %s%s", index, total, _entry_ref(entry), outcome.status, _outcome_extra(outcome))
         outcomes.append(outcome)
 
     records = [_manifest_row(item) for item in outcomes]
+    logger.debug("Writing manifest (%d records) to %s", len(records), output_dir)
     write_manifest(output_dir, records)
     errors = [
         {"page_id": item.page_id, "error": item.error}
@@ -97,6 +103,7 @@ def run_export(
     failed = sum(1 for item in outcomes if item.status == "failed")
     skipped = sum(1 for item in outcomes if item.status == "skipped")
     invalid_urls = [item.as_report() for item in resolved.invalid_urls]
+    logger.debug("Writing run report with %d errors and %d invalid URLs", len(errors), len(invalid_urls))
     write_run_report(
         output_dir,
         {
@@ -117,6 +124,7 @@ def run_export(
         description="Export run summary",
     )
     elapsed = time.monotonic() - started_mono
+    logger.debug("Export completed in %.2fs. ok=%d failed=%d skipped=%d invalid=%d", elapsed, ok, failed, skipped, len(invalid_urls))
     logger.info(
         "Done ok=%s failed=%s skipped=%s invalid=%s in %.1fs",
         ok,
@@ -136,6 +144,7 @@ def _fetch_all(
 ) -> list[PageFetchResult]:
     total = len(entries)
     results: list[PageFetchResult] = []
+    logger.debug("Starting fetch phase for %d entries...", total)
     for index, entry in enumerate(entries, start=1):
         fetch = _fetch_one(client, output_dir, entry, settings.export_force_refresh)
         logger.info(
@@ -147,6 +156,7 @@ def _fetch_all(
             _fetch_extra(fetch),
         )
         results.append(fetch)
+    logger.debug("Fetch phase complete.")
     return results
 
 
@@ -158,15 +168,20 @@ def _fetch_one(
 ) -> PageFetchResult:
     try:
         if entry.is_diff:
+            logger.debug("Entry is diff, skipping pre-fetch: %s", entry.raw)
             return PageFetchResult("ok", None, entry.page_id, None, None, None)
         if entry.page_id and not entry.needs_title_lookup:
+            logger.debug("Syncing page id=%s (force_refresh=%s)", entry.page_id, force_refresh)
             return sync_page(client, output_dir, entry.page_id, force_refresh=force_refresh)
+        logger.debug("Fetching entry by title/raw: %s", entry.raw)
         result = client.fetch_entry(entry)
         if result.status == "ok" and result.raw is not None and result.page_id:
+            logger.debug("Writing bronze for page id=%s", result.page_id)
             write_bronze(output_dir, result.raw)
             sync_page_assets(client, output_dir, result.page_id, result.raw.get("attachments") or [])
         return result
     except Exception as exc:
+        logger.debug("Exception fetching entry %s: %s", entry.raw, exc)
         return PageFetchResult("failed", str(exc), entry.page_id, entry.space_key, entry.title, None)
 
 
@@ -178,10 +193,12 @@ def _finish_page(
     publish: PublishFn,
 ) -> PageOutcome:
     if fetch.status != "ok" or fetch.raw is None or fetch.page_id is None:
+        logger.debug("Page id=%s fetch status is %s; bypassing gold transformation", fetch.page_id, fetch.status)
         return _outcome_from_fetch(output_dir, fetch)
     try:
         return _write_ok_page(output_dir, settings, fetch, batch_pages, publish)
     except Exception as exc:
+        logger.debug("Exception writing page id=%s: %s", fetch.page_id, exc)
         return PageOutcome(
             status="failed",
             error=str(exc),
@@ -207,12 +224,15 @@ def _finish_diff_page(
     if not entry.diff_versions:
         return PageOutcome("failed", "invalid_diff_versions", page_id, None, None, None, None, None, None)
     v1, v2 = entry.diff_versions
+    logger.debug("Building diff for page id=%s (v%d -> v%d)", page_id, v1, v2)
     fetch_v1 = client.fetch_page_version(page_id, v1)
     fetch_v2 = client.fetch_page_version(page_id, v2)
 
     if fetch_v1.status != "ok" or not fetch_v1.raw:
+        logger.debug("Diff fetch failed for v%d of page id=%s", v1, page_id)
         return PageOutcome("failed", fetch_v1.error or f"version_{v1}_failed", page_id, None, None, None, None, None, None)
     if fetch_v2.status != "ok" or not fetch_v2.raw:
+        logger.debug("Diff fetch failed for v%d of page id=%s", v2, page_id)
         return PageOutcome("failed", fetch_v2.error or f"version_{v2}_failed", page_id, None, None, None, None, None, None)
 
     raw1 = fetch_v1.raw
@@ -267,6 +287,7 @@ def _finish_diff_page(
     )
 
     path = write_diff_markdown(output_dir, page_id, slug, v1, v2, frontmatter, body)
+    logger.debug("Saved diff markdown: %s", path)
     publish(
         markdown=f"# Diff v{v1} -> v{v2} for {page_id}\n\n+{lines_added} / -{lines_removed} lines\n",
         key=f"diff-{page_id}-v{v1}-v{v2}",
@@ -296,7 +317,9 @@ def _write_ok_page(
 ) -> PageOutcome:
     raw = fetch.raw or {}
     page_id = fetch.page_id or ""
+    logger.debug("Writing interim storage for page id=%s", page_id)
     write_interim(output_dir, page_id, str(raw.get("body_storage") or ""))
+    logger.debug("Transforming storage XHTML to Markdown for page id=%s", page_id)
     transformed = transform_storage(
         str(raw.get("body_storage") or ""),
         context=TransformContext(
@@ -308,6 +331,7 @@ def _write_ok_page(
         ),
     )
     if transformed.failed:
+        logger.debug("Transformation failed for page id=%s: %s", page_id, transformed.error)
         return PageOutcome(
             status="failed",
             error=transformed.error or "invalid_xml",
@@ -322,6 +346,7 @@ def _write_ok_page(
         )
     frontmatter = _frontmatter(raw, transformed.unsupported_macros)
     path = write_gold_markdown(output_dir, page_id, frontmatter, transformed.markdown)
+    logger.debug("Saved gold markdown for page id=%s -> %s", page_id, path)
     gold = path.read_text(encoding="utf-8")
     publish(
         markdown=_preview(gold),
@@ -381,23 +406,27 @@ def _batch_pages(fetches: Sequence[PageFetchResult]) -> list[BatchPage]:
     return pages
 
 
-def _frontmatter(raw: Mapping[str, Any], unsupported: Sequence[str]) -> dict[str, Any]:
-    ancestors = raw.get("ancestors") or []
-    breadcrumbs = [str(item.get("title") or "") for item in ancestors if isinstance(item, dict)]
-    return {
-        "id": raw["page_id"],
-        "title": raw.get("title") or "",
-        "space_key": raw.get("space_key") or "",
-        "version": int(raw.get("version") or 0),
-        "status": raw.get("status") or "",
-        "created_by": raw.get("created_by") or "",
-        "updated_at": raw.get("updated_at") or "",
-        "source_url": raw.get("source_url") or "",
-        "labels": list(raw.get("labels") or []),
-        "breadcrumbs": breadcrumbs,
-        "attachments_count": len(raw.get("attachments") or []),
-        "unsupported_macros": list(unsupported),
-    }
+def _load_sidecar(output_dir: Path, page_id: str) -> dict[str, str]:
+    path = output_dir / asset_sidecar_path(page_id)
+    if not path.is_file():
+        return {}
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+        if isinstance(payload, dict):
+            return {str(k): str(v) for k, v in payload.items()}
+    except Exception:
+        return {}
+    return {}
+
+
+def _existing_md(output_dir: Path, page_id: str) -> str | None:
+    folder = output_dir / "04_markdown"
+    if not folder.is_dir():
+        return None
+    matches = sorted(folder.glob(f"{page_id}_*.md"))
+    if not matches:
+        return None
+    return f"04_markdown/{matches[0].name}"
 
 
 def _manifest_row(item: PageOutcome) -> dict[str, Any]:
@@ -415,36 +444,32 @@ def _manifest_row(item: PageOutcome) -> dict[str, Any]:
     }
 
 
-def _load_sidecar(output_dir: Path, page_id: str) -> dict[str, str]:
-    path = output_dir / asset_sidecar_path(page_id)
-    if not path.is_file():
-        return {}
-    payload = json.loads(path.read_text(encoding="utf-8"))
-    if not isinstance(payload, dict):
-        return {}
-    return {str(key): str(value) for key, value in payload.items()}
-
-
-def _existing_md(output_dir: Path, page_id: str) -> str | None:
-    folder = output_dir / "04_markdown"
-    if not folder.is_dir():
-        return None
-    matches = sorted(folder.glob(f"{page_id}_*.md"))
-    if not matches:
-        return None
-    return f"04_markdown/{matches[0].name}"
+def _frontmatter(raw: Mapping[str, Any], unsupported: Sequence[str]) -> dict[str, Any]:
+    ancestors = raw.get("ancestors") or []
+    breadcrumbs = [str(item.get("title") or "") for item in ancestors if isinstance(item, dict)]
+    return {
+        "id": str(raw.get("page_id") or ""),
+        "title": str(raw.get("title") or ""),
+        "space_key": str(raw.get("space_key") or ""),
+        "version": int(raw.get("version") or 0),
+        "status": str(raw.get("status") or ""),
+        "created_by": str(raw.get("created_by") or ""),
+        "updated_at": str(raw.get("updated_at") or ""),
+        "source_url": str(raw.get("source_url") or ""),
+        "labels": list(raw.get("labels") or []),
+        "breadcrumbs": breadcrumbs,
+        "attachments_count": len(raw.get("attachments") or []),
+        "unsupported_macros": list(unsupported),
+    }
 
 
 def _raw_version(raw: Mapping[str, Any] | None) -> int | None:
     if not raw or raw.get("version") is None:
         return None
-    return int(raw["version"])
-
-
-def _preview(markdown: str) -> str:
-    if len(markdown) <= PREVIEW_LIMIT:
-        return markdown
-    return markdown[:PREVIEW_LIMIT] + "\n…"
+    try:
+        return int(raw["version"])
+    except (TypeError, ValueError):
+        return None
 
 
 def _summary_markdown(
@@ -480,8 +505,14 @@ def _summary_markdown(
     return "\n".join(lines) + "\n"
 
 
-def _noop_publish(*, markdown: str, key: str | None = None, description: str | None = None) -> None:
-    return None
+def _preview(markdown: str) -> str:
+    if len(markdown) <= PREVIEW_LIMIT:
+        return markdown
+    return markdown[:PREVIEW_LIMIT] + "\n…"
+
+
+def _now() -> str:
+    return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
 def _entry_ref(entry: AcceptedEntry) -> str:
@@ -517,5 +548,5 @@ def _outcome_extra(outcome: PageOutcome) -> str:
     return (" " + " ".join(bits)) if bits else ""
 
 
-def _now() -> str:
-    return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+def _noop_publish(*, markdown: str, key: str | None = None, description: str | None = None) -> None:
+    return None
