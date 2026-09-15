@@ -71,6 +71,7 @@ ri  http://www.atlassian.com/schema/confluence/4/ri/
 | Вложение с другой страницы | скачать либо плейсхолдер `[missing-attachment: <original_name>]` и предупреждение; страница не `failed` |
 | Таблица с colspan/rowspan | GFM без объединения ячеек: атрибуты объединения игнорируются, строки дополняются пустыми ячейками до прямоугольника |
 | HTML-entities в title | декодируются до slug, frontmatter и breadcrumbs |
+| Именованные HTML-сущности в теле | декодируются в символы до разбора XML; страница `ok` |
 | `trashed` или 404 | `skipped`, запись в отчёт |
 | 403 | `failed` / `forbidden`, без ретраев |
 

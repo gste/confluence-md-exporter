@@ -28,3 +28,4 @@
 | 14 | bug | invalid-url-reasons | live-run-bugs | 2026-08-31 |
 | 15 | bug | auth-probe-non-success | live-run-bugs | 2026-08-31 |
 | 16 | bug | context-path | live-run-bugs | 2026-08-31 |
+| 17 | bug | html-entities-in-storage | live-run-bugs | 2026-08-31 |
