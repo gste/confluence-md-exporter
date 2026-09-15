@@ -1,0 +1,26 @@
+[project]
+name = "confluence-md-exporter"
+version = "0.1.0"
+description = "Local read-only export of Confluence Server/Data Center pages to Markdown"
+requires-python = ">=3.11,<3.14"
+dependencies = [
+    "prefect>=3,<4",
+]
+
+[project.scripts]
+confluence-md-exporter = "confluence_md_exporter.cli:entry"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/confluence_md_exporter"]
+
+[dependency-groups]
+dev = [
+    "pytest>=8",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
