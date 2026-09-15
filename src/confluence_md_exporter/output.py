@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import logging
 from html import unescape
 from pathlib import Path
 from typing import Any, Mapping, Sequence
@@ -17,6 +18,8 @@ from confluence_md_exporter.layout import (
     run_report_path,
     slugify,
 )
+
+logger = logging.getLogger(__name__)
 
 PAGE_STATUSES = frozenset({"ok", "failed", "skipped"})
 EDITION = "datacenter"
@@ -114,6 +117,7 @@ def write_bronze(output_dir: Path, raw: Mapping[str, Any]) -> Path:
     if payload.get("edition") != EDITION:
         raise ValueError("edition must be 'datacenter'")
     path = output_dir / raw_json_path(page_id)
+    logger.debug("Writing bronze JSON to %s", path)
     _write_json(path, payload)
     return path
 
@@ -124,6 +128,7 @@ def write_asset_sidecar(
     if not original_to_safe:
         return None
     path = output_dir / asset_sidecar_path(page_id)
+    logger.debug("Writing asset sidecar to %s", path)
     _write_json(path, dict(original_to_safe))
     return path
 
@@ -131,6 +136,7 @@ def write_asset_sidecar(
 def write_interim(output_dir: Path, page_id: str, html: str) -> Path:
     path = output_dir / interim_html_path(page_id)
     path.parent.mkdir(parents=True, exist_ok=True)
+    logger.debug("Writing interim HTML to %s", path)
     path.write_text(html, encoding="utf-8")
     return path
 
@@ -152,6 +158,7 @@ def write_gold_markdown(
     slug = slugify(str(data["title"]))
     path = output_dir / gold_markdown_path(page_id, slug)
     path.parent.mkdir(parents=True, exist_ok=True)
+    logger.debug("Writing gold markdown to %s", path)
     path.write_text(_dump_frontmatter(data) + body, encoding="utf-8")
     return path
 
@@ -170,6 +177,7 @@ def write_diff_markdown(
     path = output_dir / diff_markdown_path(page_id, slug, v_from, v_to)
     path.parent.mkdir(parents=True, exist_ok=True)
     header = _dump_custom_frontmatter(data, DIFF_FRONTMATTER_KEYS)
+    logger.debug("Writing diff markdown to %s", path)
     path.write_text(header + diff_body, encoding="utf-8")
     return path
 
@@ -185,6 +193,7 @@ def write_manifest(output_dir: Path, records: Sequence[Mapping[str, Any]]) -> Pa
             raise ValueError("manifest id must be a string or null")
         payload.append(item)
     path = output_dir / manifest_path()
+    logger.debug("Writing manifest (%d entries) to %s", len(payload), path)
     _write_json(path, payload)
     return path
 
@@ -197,6 +206,7 @@ def write_run_report(output_dir: Path, report: Mapping[str, Any]) -> Path:
     _require_keys(payload, RUN_REPORT_KEYS)
     _require_invalid_urls(payload["invalid_urls"])
     path = output_dir / run_report_path()
+    logger.debug("Writing run report to %s", path)
     _write_json(path, payload)
     return path
 
