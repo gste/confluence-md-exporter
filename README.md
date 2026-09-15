@@ -10,27 +10,29 @@
 uv sync
 ```
 
-## Окружение (.env)
+## Запуск
 
-Скопируй [`.env.example`](.env.example) в `.env` и укажи параметры подключения:
+По умолчанию: вход `input/urls.txt`, выход `output/`, доступ анонимный. База Confluence берётся из абсолютных URL в списке — отдельный `--base-url` не нужен, если в файле есть полные ссылки.
 
-```bash
-cp .env.example .env
-```
-
-Файл `.env` в git не коммитится. Передавай его при запуске:
+Стартовый список ссылок:
 
 ```bash
-uv run --env-file .env confluence-md-exporter [OPTIONS]
+cp input/urls.txt.example input/urls.txt
 ```
 
-### Основные переменные:
-- `CONFLUENCE_BASE_URL` — базовый URL инстанса: origin и опциональный контекст-путь (без `/wiki` и без хвоста `/`). Пример: `https://confluence.example.com` или `https://confluence.example.com/confluence`.
-- `CONFLUENCE_AUTH_TYPE` — `bearer` (рекомендуется) или `basic`.
-- `CONFLUENCE_TOKEN` — Personal Access Token (PAT) или пароль.
-- `CONFLUENCE_USERNAME` — имя пользователя (обязательно только для `basic`).
-- `EXPORT_INPUT_FILE` — путь по умолчанию к файлу со списком URL (например `input/urls.txt`).
-- `EXPORT_OUTPUT_DIR` — каталог сохранения по умолчанию (например `data` или `output`).
+Закрытый инстанс (нужны учётные данные):
+
+```bash
+uv run confluence-md-exporter -u USER -t TOKEN
+```
+
+Только PAT (Bearer):
+
+```bash
+uv run confluence-md-exporter -t TOKEN
+```
+
+`.env` не обязателен. Если удобнее держать креды в файле — [`.env.example`](.env.example) и `uv run --env-file .env confluence-md-exporter`. CLI-флаги перекрывают окружение.
 
 ---
 
@@ -56,17 +58,17 @@ uv run --env-file .env confluence-md-exporter [OPTIONS]
 ## CLI команды и флаги
 
 ```text
-usage: confluence-md-exporter [-h] [-i INPUT] [-o OUTPUT] [-r] [-c] [-s]
-
-Export Confluence Server/Data Center pages to Markdown.
+usage: confluence-md-exporter [-h] [-i INPUT] [-o OUTPUT] [-u USER] [-t TOKEN]
+                              [--base-url URL] [-r] [-c] [-s]
 
 options:
-  -h, --help            Показать справку по командам и выйти
-  -i, --input INPUT     Путь к файлу со списком URL (переопределяет EXPORT_INPUT_FILE)
-  -o, --output OUTPUT   Каталог для выгрузки (переопределяет EXPORT_OUTPUT_DIR)
-  -r, --refresh         Игнорировать disk-skip и принудительно обновить контент (алиас: --force-refresh)
-  -c, --clean           Полностью очистить каталог выгрузки перед началом работы
-  -s, --simple          Принят для совместимости; выгрузка всегда однопоточная
+  -i, --input INPUT     Список URL (default: input/urls.txt)
+  -o, --output OUTPUT   Каталог выгрузки (default: output)
+  -u, --user USER       Имя пользователя (вместе с -t — HTTP Basic)
+  -t, --token TOKEN     PAT или пароль
+  --base-url URL        База инстанса, если её нельзя вывести из списка URL
+  -r, --refresh         Игнорировать disk-skip
+  -c, --clean           Очистить каталог выгрузки перед работой
 ```
 
 Выгрузка всегда однопоточная: один процесс, страницы строго последовательно, без Prefect и без лишних серверов. В консоли на уровне INFO виден прогресс каждой страницы и итоговая сводка.
@@ -76,26 +78,26 @@ options:
 ## Примеры использования
 
 ### 1. Обычный запуск
-Выгрузка страниц по списку из `input/urls.txt`:
+Выгрузка страниц по списку из `input/urls.txt` (анонимно, база из URL):
 ```bash
-uv run --env-file .env confluence-md-exporter
+uv run confluence-md-exporter
 ```
 
 ### 2. Чистая выгрузка с очисткой папки
 Полная очистка папки выгрузки и выгрузка заново:
 ```bash
-uv run --env-file .env confluence-md-exporter -c
+uv run confluence-md-exporter -c
 ```
 
 ### 3. Принудительное обновление кэша (Refresh)
 Перескачивание контента даже при совпадении версий на диске:
 ```bash
-uv run --env-file .env confluence-md-exporter -r
+uv run confluence-md-exporter -r
 ```
 
 ### 4. Указание произвольных входных и выходных путей
 ```bash
-uv run --env-file .env confluence-md-exporter -i ./my_pages.txt -o ./exports/march_release
+uv run confluence-md-exporter -i ./my_pages.txt -o ./exports/march_release
 ```
 
 ### 5. Выгрузка разницы версий (Diff)
@@ -105,7 +107,7 @@ https://confluence.example.com/pages/diffpagesbyversion.action?pageId=607636678&
 ```
 И запусти:
 ```bash
-uv run --env-file .env confluence-md-exporter
+uv run confluence-md-exporter
 ```
 В результате в папке `05_diffs/` будет создан файл `607636678_title_v41_to_v42.md` с YAML-метаданными (авторы версий, даты, статистика `+X/-Y`) и блоком ` ```diff `.
 
@@ -114,7 +116,7 @@ uv run --env-file .env confluence-md-exporter
 ## Структура выгрузки (Output)
 
 ```text
-data/
+output/
 ├── 01_raw/             # Сырой Confluence JSON ответа REST API
 ├── 02_interim/         # Storage XML страницы
 ├── 03_assets/          # Скачанные вложения и картинки (по page_id)

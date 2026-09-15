@@ -53,6 +53,23 @@ def test_exit_2_when_input_file_missing(tmp_path: Path) -> None:
     export.assert_not_called()
 
 
+def test_anonymous_skips_auth_probe(tmp_path: Path) -> None:
+    urls = tmp_path / "urls.txt"
+    urls.write_text("https://confluence.example.com/pages/viewpage.action?pageId=11\n", encoding="utf-8")
+    probe = Mock(side_effect=AssertionError("probe must not run for anonymous"))
+    export = Mock(return_value=0)
+    code = main(
+        argv=["-i", str(urls), "-o", str(tmp_path / "data")],
+        environ={},
+        run_export=export,
+        auth_probe=probe,
+    )
+    assert code == 0
+    probe.assert_not_called()
+    export.assert_called_once()
+    assert export.call_args.args[0].confluence_auth_type == "anonymous"
+
+
 def test_exit_2_on_http_401_before_pages(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
     export = Mock()
     transport_calls: list[str] = []

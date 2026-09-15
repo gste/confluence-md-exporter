@@ -1,7 +1,10 @@
-# Local export dumps and inputs
+# Local export dumps
 data/
 output/
-input/
+
+# Local URL lists (keep the example committed)
+input/*
+!input/urls.txt.example
 
 # Credentials (keep `.env.example`)
 .env

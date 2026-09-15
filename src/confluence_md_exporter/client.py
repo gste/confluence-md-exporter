@@ -222,12 +222,15 @@ class ConfluenceClient:
 
     def _headers(self, *, accept: str = "application/json") -> dict[str, str]:
         settings = self._settings
+        headers = {"Accept": accept}
+        if settings.confluence_auth_type == "anonymous" or not settings.confluence_token:
+            return headers
         if settings.confluence_auth_type == "bearer":
-            authorization = f"Bearer {settings.confluence_token}"
+            headers["Authorization"] = f"Bearer {settings.confluence_token}"
         else:
             raw = f"{settings.confluence_username}:{settings.confluence_token}".encode("utf-8")
-            authorization = f"Basic {base64.b64encode(raw).decode('ascii')}"
-        return {"Authorization": authorization, "Accept": accept}
+            headers["Authorization"] = f"Basic {base64.b64encode(raw).decode('ascii')}"
+        return headers
 
     def _url(self, path: str) -> str:
         return self._settings.confluence_base_url + path

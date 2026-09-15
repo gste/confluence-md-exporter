@@ -15,6 +15,7 @@
 - коды причины отклонённых URL из [02-input.md#rejection-reasons](./02-input.md#rejection-reasons);
 - коды выхода `0` / `1` / `2` из [01-configuration.md#exit-codes](./01-configuration.md#exit-codes);
 - отказ стартовать при `CONFLUENCE_EDITION`, отличном от `datacenter`;
+- вывод базы приложения из абсолютных URL входа и анонимный запуск без заголовка `Authorization`;
 - канонические ссылки `../03_assets/...`: каждая такая ссылка в сгенерированном Markdown резолвится в существующий файл.
 
 Повторный прогон без force-refresh на неизменённых страницах даёт `skipped` и не меняет байты актуальных файлов в `03_assets/` и `04_markdown/<page_id>_*.md`. Это проверяется тестом, не только ручным прогоном.

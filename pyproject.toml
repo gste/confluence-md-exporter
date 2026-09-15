@@ -2,8 +2,14 @@
 name = "confluence-md-exporter"
 version = "0.1.0"
 description = "Local read-only export of Confluence Server/Data Center pages to Markdown"
+readme = "README.md"
+license = "MIT"
 requires-python = ">=3.11,<3.14"
 dependencies = []
+
+[project.urls]
+Homepage = "https://github.com/gste/confluence-md-exporter"
+Repository = "https://github.com/gste/confluence-md-exporter"
 
 [project.scripts]
 confluence-md-exporter = "confluence_md_exporter.cli:entry"
