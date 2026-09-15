@@ -1,0 +1,3 @@
+# Copy to input/urls.txt. One URL per line. Lines starting with # are ignored.
+https://confluence.example.com/pages/viewpage.action?pageId=123456
+https://confluence.example.com/display/SPACE/Page+Title

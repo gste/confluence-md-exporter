@@ -25,7 +25,6 @@ def _settings(tmp_path: Path, urls: Path) -> Settings:
         confluence_max_retries=3,
         export_output_dir=str(tmp_path / "data"),
         export_input_file=str(urls),
-        export_concurrency=1,
         export_force_refresh=True,
         log_level="INFO",
     )

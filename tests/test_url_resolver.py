@@ -5,7 +5,7 @@ from pathlib import Path
 import pytest
 
 from confluence_md_exporter.settings import ConfigError
-from confluence_md_exporter.url_resolver import InvalidUrl, resolve_input_file
+from confluence_md_exporter.url_resolver import InvalidUrl, infer_base_url, resolve_input_file
 
 BASE = "https://confluence.example.com"
 
@@ -70,6 +70,37 @@ def test_relative_path_resolved_against_base(tmp_path: Path) -> None:
     result = resolve_input_file(path, BASE)
     assert result.pages_total == 1
     assert result.entries[0].page_id == "106"
+
+
+def test_diff_page_url_with_selected_versions(tmp_path: Path) -> None:
+    url = f"{BASE}/pages/diffpagesbyversion.action?pageId=607636678&selectedPageVersions=41&selectedPageVersions=42"
+    path = _write(tmp_path, f"{url}\n")
+    result = resolve_input_file(path, BASE)
+    assert result.pages_total == 1
+    entry = result.entries[0]
+    assert entry.page_id == "607636678"
+    assert entry.is_diff is True
+    assert entry.diff_versions == (41, 42)
+    assert result.invalid_urls == ()
+
+
+def test_diff_page_url_with_original_and_revised_version(tmp_path: Path) -> None:
+    url = f"{BASE}/pages/diffpagesbyversion.action?pageId=607636678&originalVersion=41&revisedVersion=42"
+    path = _write(tmp_path, f"{url}\n")
+    result = resolve_input_file(path, BASE)
+    assert result.pages_total == 1
+    entry = result.entries[0]
+    assert entry.page_id == "607636678"
+    assert entry.is_diff is True
+    assert entry.diff_versions == (41, 42)
+
+
+def test_diff_page_url_malformed_missing_version(tmp_path: Path) -> None:
+    url = f"{BASE}/pages/diffpagesbyversion.action?pageId=607636678&selectedPageVersions=41"
+    path = _write(tmp_path, f"{url}\n")
+    result = resolve_input_file(path, BASE)
+    assert result.pages_total == 0
+    assert result.invalid_urls == (InvalidUrl(url=url, reason="malformed"),)
 
 
 def test_tiny_link_is_invalid_with_reason(tmp_path: Path, caplog: pytest.LogCaptureFixture) -> None:
@@ -158,7 +189,9 @@ def test_origin_without_context_path_is_invalid(tmp_path: Path) -> None:
     path = _write(tmp_path, f"{BASE}/pages/viewpage.action?pageId=202\n")
     result = resolve_input_file(path, CONTEXT)
     assert result.pages_total == 0
-    assert result.invalid_urls == (f"{BASE}/pages/viewpage.action?pageId=202",)
+    assert result.invalid_urls == (
+        InvalidUrl(url=f"{BASE}/pages/viewpage.action?pageId=202", reason="unrecognized_form"),
+    )
 
 
 def test_context_path_relative_from_origin(tmp_path: Path) -> None:
@@ -172,4 +205,37 @@ def test_root_relative_rejected_when_base_has_context(tmp_path: Path) -> None:
     path = _write(tmp_path, "/pages/viewpage.action?pageId=204\n")
     result = resolve_input_file(path, CONTEXT)
     assert result.pages_total == 0
-    assert len(result.invalid_urls) == 1
+    assert result.invalid_urls == (
+        InvalidUrl(url="/pages/viewpage.action?pageId=204", reason="unrecognized_form"),
+    )
+
+
+def test_infer_base_url_from_viewpage(tmp_path: Path) -> None:
+    path = _write(tmp_path, f"{BASE}/pages/viewpage.action?pageId=11\n")
+    assert infer_base_url(path) == BASE
+
+
+def test_infer_base_url_with_context_path(tmp_path: Path) -> None:
+    path = _write(tmp_path, f"{BASE}/confluence/pages/viewpage.action?pageId=11\n")
+    assert infer_base_url(path) == f"{BASE}/confluence"
+
+
+def test_infer_base_url_from_wiki_form(tmp_path: Path) -> None:
+    path = _write(tmp_path, f"{BASE}/wiki/spaces/DEV/pages/11/Title\n")
+    assert infer_base_url(path) == BASE
+
+
+def test_infer_base_url_rejects_mixed_bases(tmp_path: Path) -> None:
+    path = _write(
+        tmp_path,
+        f"{BASE}/pages/viewpage.action?pageId=11\n"
+        f"{BASE}/confluence/pages/viewpage.action?pageId=12\n",
+    )
+    with pytest.raises(ConfigError, match="different Confluence bases"):
+        infer_base_url(path)
+
+
+def test_infer_base_url_fails_on_bare_ids_only(tmp_path: Path) -> None:
+    path = _write(tmp_path, "123456\n")
+    with pytest.raises(ConfigError, match="cannot infer CONFLUENCE_BASE_URL"):
+        infer_base_url(path)

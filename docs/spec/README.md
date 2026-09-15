@@ -21,7 +21,7 @@
 | [03-output.md](./03-output.md) | layout слоёв, bronze/gold, manifest, report, slug, безопасные имена |
 | [04-fetch.md](./04-fetch.md) | REST DC, вложения, disk-skip, изоляция на выгрузке |
 | [05-transform.md](./05-transform.md) | Storage Format → GFM, известные макросы, fallback, краевые случаи |
-| [06-orchestration.md](./06-orchestration.md) | Prefect 3.x flow, изоляция батча, артефакты UI, read-only |
+| [06-orchestration.md](./06-orchestration.md) | однопоточный запуск, изоляция батча, прогресс в консоли, read-only |
 | [07-testing.md](./07-testing.md) | обязательное покрытие тестами и критерии приёмки продукта |
 
 ## Review tour
@@ -34,7 +34,7 @@
 4. **03-output** — дерево `01_raw`…`04_markdown`, канон `../03_assets/...`, обязательные ключи frontmatter/manifest/report, таблица транслитерации slug.
 5. **04-fetch** — REST без `/wiki`, запрет UI-download, disk-skip по `version` + size ассетов.
 6. **05-transform** — таблица известных конструкций и HTML-комментарий fallback; страница не `failed` из‑за неизвестного макроса.
-7. **06-orchestration** — батч не падает на одной странице; все-`skipped` — успешный запуск; Prefect-артефакты.
+7. **06-orchestration** — батч не падает на одной странице; все-`skipped` — успешный запуск; прогресс в консоли.
 8. **07-testing** — фикстуры без сети покрывают каждый URL-паттерн и каждую конструкцию; секретов в фикстурах нет.
 
 ## Coverage

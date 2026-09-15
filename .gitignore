@@ -2,6 +2,10 @@
 data/
 output/
 
+# Local URL lists (keep the example committed)
+input/*
+!input/urls.txt.example
+
 # Credentials (keep `.env.example`)
 .env
 .env.*

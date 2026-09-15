@@ -7,7 +7,7 @@ from pathlib import Path
 from typing import Mapping
 from urllib.parse import urlparse
 
-ALLOWED_AUTH_TYPES = frozenset({"basic", "bearer"})
+ALLOWED_AUTH_TYPES = frozenset({"anonymous", "basic", "bearer"})
 ALLOWED_EDITION = "datacenter"
 ALLOWED_LOG_LEVELS = frozenset({"DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"})
 TRUE_VALUES = frozenset({"true"})
@@ -34,7 +34,6 @@ class Settings:
     confluence_max_retries: int
     export_output_dir: str
     export_input_file: str
-    export_concurrency: int
     export_force_refresh: bool
     log_level: str
 
@@ -45,21 +44,23 @@ def load_settings(
     input_file: str | None = None,
     output_dir: str | None = None,
     force_refresh: bool | None = None,
+    base_url: str | None = None,
+    username: str | None = None,
+    token: str | None = None,
 ) -> Settings:
     edition = _optional(environ, "CONFLUENCE_EDITION", ALLOWED_EDITION)
     if edition != ALLOWED_EDITION:
         raise ConfigError("CONFLUENCE_EDITION must be 'datacenter'")
 
-    auth_type = _required(environ, "CONFLUENCE_AUTH_TYPE").lower()
-    if auth_type not in ALLOWED_AUTH_TYPES:
-        raise ConfigError("CONFLUENCE_AUTH_TYPE must be 'basic' or 'bearer'")
-
-    token = _required(environ, "CONFLUENCE_TOKEN")
-    username = _optional(environ, "CONFLUENCE_USERNAME", "") or None
-    if auth_type == "basic" and username is None:
+    token_value = _first(token, environ.get("CONFLUENCE_TOKEN"))
+    username_value = _first(username, environ.get("CONFLUENCE_USERNAME"))
+    auth_type = _resolve_auth_type(environ.get("CONFLUENCE_AUTH_TYPE"), username_value, token_value)
+    if auth_type == "basic" and username_value is None:
         raise ConfigError("CONFLUENCE_USERNAME is required when CONFLUENCE_AUTH_TYPE is 'basic'")
-
-    base_url = _normalize_base_url(_required(environ, "CONFLUENCE_BASE_URL"))
+    if auth_type in {"basic", "bearer"} and not token_value:
+        raise ConfigError("CONFLUENCE_TOKEN is required when authentication is not anonymous")
+    if username_value is not None and not token_value:
+        raise ConfigError("CONFLUENCE_TOKEN is required when a username is set")
 
     verify_ssl = _boolean(environ, "CONFLUENCE_VERIFY_SSL", default=True)
     timeout_seconds = _int(environ, "CONFLUENCE_TIMEOUT_SECONDS", default=30, minimum=1)
@@ -76,7 +77,6 @@ def load_settings(
     else:
         export_force = force_refresh
 
-    concurrency = _int(environ, "EXPORT_CONCURRENCY", default=2, minimum=1)
     log_level = _optional(environ, "LOG_LEVEL", "INFO").upper()
     if log_level == "WARN":
         log_level = "WARNING"
@@ -87,28 +87,51 @@ def load_settings(
     if not input_path.is_file():
         raise ConfigError(f"input file does not exist: {export_input}")
 
+    explicit_base = _first(base_url, environ.get("CONFLUENCE_BASE_URL"))
+    if explicit_base:
+        resolved_base = _normalize_base_url(explicit_base)
+    else:
+        from confluence_md_exporter.url_resolver import infer_base_url
+
+        resolved_base = infer_base_url(export_input)
+
     return Settings(
-        confluence_base_url=base_url,
+        confluence_base_url=resolved_base,
         confluence_edition=ALLOWED_EDITION,
         confluence_auth_type=auth_type,
-        confluence_token=token,
-        confluence_username=username,
+        confluence_token=token_value or "",
+        confluence_username=username_value,
         confluence_verify_ssl=verify_ssl,
         confluence_timeout_seconds=timeout_seconds,
         confluence_max_retries=max_retries,
         export_output_dir=export_output,
         export_input_file=export_input,
-        export_concurrency=concurrency,
         export_force_refresh=export_force,
         log_level=log_level,
     )
 
 
-def _required(environ: Mapping[str, str], key: str) -> str:
-    value = environ.get(key)
-    if value is None or not str(value).strip():
-        raise ConfigError(f"{key} is required")
-    return str(value).strip()
+def _first(*values: str | None) -> str | None:
+    for value in values:
+        if value is None:
+            continue
+        stripped = str(value).strip()
+        if stripped:
+            return stripped
+    return None
+
+
+def _resolve_auth_type(explicit: str | None, username: str | None, token: str | None) -> str:
+    if explicit is not None and str(explicit).strip():
+        auth_type = str(explicit).strip().lower()
+        if auth_type not in ALLOWED_AUTH_TYPES:
+            raise ConfigError("CONFLUENCE_AUTH_TYPE must be 'anonymous', 'basic' or 'bearer'")
+        return auth_type
+    if token and username:
+        return "basic"
+    if token:
+        return "bearer"
+    return "anonymous"
 
 
 def _optional(environ: Mapping[str, str], key: str, default: str) -> str:
