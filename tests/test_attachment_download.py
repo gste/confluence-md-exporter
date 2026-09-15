@@ -22,7 +22,6 @@ def _settings() -> Settings:
         confluence_max_retries=3,
         export_output_dir="data",
         export_input_file="input/urls.txt",
-        export_concurrency=2,
         export_force_refresh=False,
         log_level="INFO",
     )
@@ -62,6 +61,38 @@ def test_download_uses_rest_not_ui_path_and_same_authorization(tmp_path: Path) -
     sidecar = json.loads((tmp_path / "01_raw" / "42.assets.json").read_text(encoding="utf-8"))
     assert sidecar == {"diagram.png": "diagram.png"}
     assert result.original_to_safe == sidecar
+
+
+def test_anonymous_download_has_no_authorization(tmp_path: Path) -> None:
+    transport = ScriptedTransport([HttpResponse(200, b"png-bytes", {})])
+    settings = Settings(
+        confluence_base_url=BASE,
+        confluence_edition="datacenter",
+        confluence_auth_type="anonymous",
+        confluence_token="",
+        confluence_username=None,
+        confluence_verify_ssl=True,
+        confluence_timeout_seconds=30,
+        confluence_max_retries=3,
+        export_output_dir="data",
+        export_input_file="input/urls.txt",
+        export_force_refresh=False,
+        log_level="INFO",
+    )
+    client = ConfluenceClient(settings, transport=transport, sleep=lambda _d: None)
+    attachments = [
+        {
+            "id": "att-1",
+            "title": "diagram.png",
+            "media_type": "image/png",
+            "file_size": 9,
+            "download_path": "/rest/api/content/att-1",
+        }
+    ]
+    result = sync_page_assets(client, tmp_path, "42", attachments)
+    assert result.page_failed is False
+    _url, headers = transport.calls[0]
+    assert "Authorization" not in headers
 
 
 def test_inaccessible_cross_page_attachment_is_placeholder_not_failed(tmp_path: Path) -> None:

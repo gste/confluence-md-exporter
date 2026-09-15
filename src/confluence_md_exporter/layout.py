@@ -120,6 +120,10 @@ def gold_markdown_path(page_id: str, slug: str) -> str:
     return f"04_markdown/{page_id}_{slug}.md"
 
 
+def diff_markdown_path(page_id: str, slug: str, v_from: int, v_to: int) -> str:
+    return f"05_diffs/{page_id}_{slug}_v{v_from}_to_v{v_to}.md"
+
+
 def manifest_path() -> str:
     return "04_markdown/manifest.json"
 

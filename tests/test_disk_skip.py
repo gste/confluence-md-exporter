@@ -35,7 +35,6 @@ def _settings(*, force_refresh: bool = False) -> Settings:
         confluence_max_retries=3,
         export_output_dir="data",
         export_input_file="input/urls.txt",
-        export_concurrency=2,
         export_force_refresh=force_refresh,
         log_level="INFO",
     )
