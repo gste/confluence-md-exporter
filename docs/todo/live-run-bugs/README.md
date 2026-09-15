@@ -44,8 +44,9 @@ Tiny-link как успешный резолв — не баг: он в [out of 
 |---|---|---|---|---|
 | 01 | [01-invalid-url-reasons.md](./bug/01-invalid-url-reasons.md) | `2026-08-31` | `spec-patch` | — |
 | 02 | [02-auth-probe-non-success.md](./bug/02-auth-probe-non-success.md) | `2026-08-31` | `spec-patch` | — |
+| 03 | [03-context-path.md](./bug/03-context-path.md) | `2026-08-31` | `adr+spec` | принятый [ADR 0001](../../decisions/0001-dc-context-path.md) |
 
-01 и 02 независимы. Вести по одному через `/fix-bug`.
+01 и 02 независимы. Вести по одному через `/fix-bug`. 03 — после `accepted` ADR и merge зеркала в спеке.
 
 ## Done
 
