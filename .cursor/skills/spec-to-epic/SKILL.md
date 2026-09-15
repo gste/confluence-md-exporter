@@ -12,4 +12,4 @@ This skill carries no rules of its own. The repository files are the source of t
 2. Read `docs/process/prompts/03-spec-to-epic.md` and follow it as the procedure for this job.
 3. Read only the spec modules that fall inside the requested epic scope.
 
-Write slices to `docs/todo/<epic>/task/` or `docs/todo/<epic>/bug/`. Tasks link to spec anchors and carry a DoD; they never copy requirement text. Do not write product code and do not edit `docs/spec/**` in this job.
+Write slices to `docs/todo/<epic>/task/` or `docs/todo/<epic>/bug/`. Allocate `NN` from `docs/todo/README.md` (Closed ∪ live files). Tasks link to spec anchors and carry a DoD; they never copy requirement text. Do not write product code, do not edit `docs/spec/**`, and do not edit `CHANGELOG.md` in this job. Commit the slice.

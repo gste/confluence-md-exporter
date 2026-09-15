@@ -12,4 +12,4 @@ This skill carries no rules of its own. The repository files are the source of t
 2. Read `docs/process/prompts/05-fix-bug.md` and follow it as the procedure for this job.
 3. Fix one bug only: the given `bug/` file, or an observation that creates one.
 
-Stop at human gates (ADR accept, spec review). Do not mix uncommitted spec and code. Do not merge or push to the default branch.
+Stop at human gates (ADR accept). Commit each completed step (spec, then code). Do not mix uncommitted spec and code. Do not merge or push to the default branch.
