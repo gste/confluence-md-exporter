@@ -44,12 +44,11 @@ def test_help_describes_defaults_examples_and_hides_simple() -> None:
     text = build_parser().format_help()
     assert "input/urls.txt" in text
     assert "output/" in text
-    assert "анонимный" in text
+    assert "anonymous" in text
     assert "-i urls.txt -o output -t PAT" in text
     assert "--base-url" in text
-    assert "Коды выхода" in text
-    assert "README.ru.md" in text
-    assert "показать справку и выйти" in text
+    assert "Exit codes" in text
+    assert "README.ru.md" not in text
     assert "--simple" not in text
     assert "Ignored:" not in text
 

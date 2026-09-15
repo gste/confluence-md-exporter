@@ -19,31 +19,29 @@ ExportFn = Callable[[Settings], int | None]
 AuthProbe = Callable[[Settings], None]
 
 _HELP_EPILOG = """\
-По умолчанию: вход input/urls.txt, выход output/, доступ анонимный.
-База Confluence берётся из абсолютных URL в списке.
+Defaults: input/urls.txt, output/, anonymous access.
+The Confluence base URL is inferred from absolute URLs in the list.
 
-Примеры:
+Examples:
   confluence-md-exporter -i urls.txt -o output
-      открытый инстанс, полные ссылки в списке
+      public instance, full page URLs in the list
 
   confluence-md-exporter -i urls.txt -o output -t PAT
-      закрытый инстанс, Personal Access Token (Bearer)
+      private instance, Personal Access Token (Bearer)
 
   confluence-md-exporter -i urls.txt -o output -u USER -t TOKEN
-      закрытый инстанс, HTTP Basic (логин + PAT/пароль)
+      private instance, HTTP Basic (username + PAT/password)
 
   confluence-md-exporter -i ids.txt -o output --base-url https://confluence.example.com
-      в списке только page id, база задана явно
+      page ids only, base URL set explicitly
 
   confluence-md-exporter -i urls.txt -o output -c
-      очистить каталог выгрузки и скачать заново
+      wipe the output directory and export from scratch
 
   confluence-md-exporter -i urls.txt -o output -r
-      не пропускать страницы, версия которых уже есть на диске
+      do not skip pages whose version is already on disk
 
-Коды выхода: 0 — ok/skipped; 1 — есть failed; 2 — конфиг, авторизация или нет входного файла.
-README: https://github.com/gste/confluence-md-exporter#readme
-Русский: https://github.com/gste/confluence-md-exporter/blob/master/README.ru.md
+Exit codes: 0 ok/skipped; 1 some pages failed; 2 config, auth, or missing input file.
 """
 
 
@@ -51,25 +49,16 @@ def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="confluence-md-exporter",
         description=(
-            "Локальная read-only выгрузка страниц Confluence Server/Data Center "
-            "в Markdown, вложения и diff версий."
+            "Local read-only export of Confluence Server/Data Center pages "
+            "to Markdown, attachments, and version diffs."
         ),
         epilog=_HELP_EPILOG,
         formatter_class=argparse.RawDescriptionHelpFormatter,
-        add_help=False,
-    )
-    parser.add_argument(
-        "-h",
-        "--help",
-        action="help",
-        default=argparse.SUPPRESS,
-        help="показать справку и выйти",
     )
     parser.add_argument(
         "--version",
         action="version",
         version=f"%(prog)s {__version__}",
-        help="показать версию и выйти",
     )
     parser.add_argument(
         "-i",
@@ -77,7 +66,7 @@ def build_parser() -> argparse.ArgumentParser:
         dest="input",
         metavar="FILE",
         default=None,
-        help="список URL (по умолчанию input/urls.txt)",
+        help="URL list (default: input/urls.txt)",
     )
     parser.add_argument(
         "-o",
@@ -85,7 +74,7 @@ def build_parser() -> argparse.ArgumentParser:
         dest="output",
         metavar="DIR",
         default=None,
-        help="каталог выгрузки (по умолчанию output)",
+        help="output directory (default: output)",
     )
     parser.add_argument(
         "-r",
@@ -94,7 +83,7 @@ def build_parser() -> argparse.ArgumentParser:
         dest="force_refresh",
         action="store_true",
         default=None,
-        help="игнорировать disk-skip и перекачать страницы заново",
+        help="ignore disk-skip and re-fetch pages",
     )
     parser.add_argument(
         "-c",
@@ -102,7 +91,7 @@ def build_parser() -> argparse.ArgumentParser:
         dest="clean",
         action="store_true",
         default=False,
-        help="очистить каталог выгрузки перед работой",
+        help="wipe the output directory before export",
     )
     parser.add_argument(
         "-u",
@@ -111,7 +100,7 @@ def build_parser() -> argparse.ArgumentParser:
         dest="username",
         metavar="USER",
         default=None,
-        help="имя пользователя; вместе с -t — HTTP Basic",
+        help="username; with -t uses HTTP Basic",
     )
     parser.add_argument(
         "-t",
@@ -119,14 +108,14 @@ def build_parser() -> argparse.ArgumentParser:
         dest="token",
         metavar="TOKEN",
         default=None,
-        help="Personal Access Token или пароль; один -t — Bearer",
+        help="Personal Access Token or password; -t alone uses Bearer",
     )
     parser.add_argument(
         "--base-url",
         dest="base_url",
         metavar="URL",
         default=None,
-        help="база инстанса, если её нельзя вывести из списка URL",
+        help="instance base URL if it cannot be inferred from the list",
     )
     parser.add_argument(
         "-s",
