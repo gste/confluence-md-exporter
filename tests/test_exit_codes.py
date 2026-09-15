@@ -37,7 +37,7 @@ def test_version_flag(capsys: pytest.CaptureFixture[str]) -> None:
     with pytest.raises(SystemExit) as exc:
         parse_cli(["--version"])
     assert exc.value.code == 0
-    assert "1.0.1" in capsys.readouterr().out
+    assert "1.0.2" in capsys.readouterr().out
 
 
 def test_help_describes_defaults_examples_and_hides_simple() -> None:
