@@ -11,6 +11,9 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: write  # Required to push git tags
+    outputs:
+      should_tag: ${{ steps.tagger.outputs.should_tag }}
+      tag_name: ${{ steps.tagger.outputs.tag_name }}
 
     steps:
       - name: Checkout repository
@@ -66,3 +69,10 @@ jobs:
           git tag -a "$TAG_NAME" -m "Release $TAG_NAME"
           git push origin "$TAG_NAME"
           echo "Successfully created and pushed tag $TAG_NAME"
+
+  publish:
+    needs: check-and-tag
+    if: needs.check-and-tag.outputs.should_tag == 'true'
+    permissions:
+      id-token: write
+    uses: ./.github/workflows/publish.yml
