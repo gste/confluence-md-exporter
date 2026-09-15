@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- выгрузка всегда однопоточная, без Prefect; прогресс каждой страницы в консоли; снимок Prefect — тег `history/prefect-orchestration`
 - default `EXPORT_OUTPUT_DIR` — `output/` (`01-configuration.md`, `03-output.md#layout`)
 - 17 именованные HTML-сущности в Storage Format не валят страницу (`05-transform.md#edge-cases`)
 - тест-кейсы живут в `tests/`, не отдельным каталогом в `docs/` (`07-testing.md#test-cases`)

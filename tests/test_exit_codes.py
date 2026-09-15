@@ -28,7 +28,6 @@ def _env(tmp_path: Path, **overrides: str) -> dict[str, str]:
         "CONFLUENCE_TOKEN": "dummy-token",
         "EXPORT_INPUT_FILE": str(urls),
         "EXPORT_OUTPUT_DIR": str(tmp_path / "data"),
-        "EXPORT_CONCURRENCY": "1",
     }
     env.update(overrides)
     return env

@@ -34,7 +34,6 @@ class Settings:
     confluence_max_retries: int
     export_output_dir: str
     export_input_file: str
-    export_concurrency: int
     export_force_refresh: bool
     log_level: str
 
@@ -45,7 +44,6 @@ def load_settings(
     input_file: str | None = None,
     output_dir: str | None = None,
     force_refresh: bool | None = None,
-    concurrency: int | None = None,
 ) -> Settings:
     edition = _optional(environ, "CONFLUENCE_EDITION", ALLOWED_EDITION)
     if edition != ALLOWED_EDITION:
@@ -77,11 +75,6 @@ def load_settings(
     else:
         export_force = force_refresh
 
-    if concurrency is not None:
-        export_concurrency = max(1, concurrency)
-    else:
-        export_concurrency = _int(environ, "EXPORT_CONCURRENCY", default=2, minimum=1)
-
     log_level = _optional(environ, "LOG_LEVEL", "INFO").upper()
     if log_level == "WARN":
         log_level = "WARNING"
@@ -103,7 +96,6 @@ def load_settings(
         confluence_max_retries=max_retries,
         export_output_dir=export_output,
         export_input_file=export_input,
-        export_concurrency=export_concurrency,
         export_force_refresh=export_force,
         log_level=log_level,
     )

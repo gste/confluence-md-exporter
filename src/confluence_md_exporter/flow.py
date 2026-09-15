@@ -1,18 +1,16 @@
-"""Export flow: isolate pages, support diff URLs, write catalog/report, publish artifacts."""
+"""Export run: isolate pages, support diff URLs, write catalog/report, log progress."""
 
 from __future__ import annotations
 
 import difflib
 import json
+import logging
 import shutil
-from concurrent.futures import ThreadPoolExecutor, as_completed
+import time
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Callable, Mapping, Sequence
-
-from prefect import flow
-from prefect.artifacts import create_markdown_artifact
 
 from confluence_md_exporter.assets import sync_page_assets
 from confluence_md_exporter.client import ConfluenceClient, PageFetchResult
@@ -32,6 +30,7 @@ from confluence_md_exporter.url_resolver import AcceptedEntry, resolve_input_fil
 
 PREVIEW_LIMIT = 8000
 PublishFn = Callable[..., Any]
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -49,11 +48,6 @@ class PageOutcome:
     markdown: str | None = None
 
 
-@flow(name="confluence-md-export")
-def export_flow(settings: Settings, *, clean: bool = False) -> int:
-    return run_export(settings, clean=clean)
-
-
 def run_export(
     settings: Settings,
     *,
@@ -62,6 +56,7 @@ def run_export(
     clean: bool = False,
 ) -> int:
     started = _now()
+    started_mono = time.monotonic()
     output_dir = Path(settings.export_output_dir)
     if clean and output_dir.exists():
         shutil.rmtree(output_dir)
@@ -69,16 +64,26 @@ def run_export(
 
     resolved = resolve_input_file(settings.export_input_file, settings.confluence_base_url)
     http = client or ConfluenceClient(settings)
-    publisher = publish or _publish_markdown
+    publisher = publish if publish is not None else _noop_publish
+    total = len(resolved.entries)
+    logger.info(
+        "Export %s page(s), %s invalid URL(s) from %s -> %s%s",
+        total,
+        len(resolved.invalid_urls),
+        settings.export_input_file,
+        settings.export_output_dir,
+        ", force-refresh" if settings.export_force_refresh else "",
+    )
 
     fetches = _fetch_all(http, output_dir, resolved.entries, settings)
     batch_pages = _batch_pages(fetches)
     outcomes: list[PageOutcome] = []
-    for entry, fetch in zip(resolved.entries, fetches):
+    for index, (entry, fetch) in enumerate(zip(resolved.entries, fetches), start=1):
         if entry.is_diff and entry.diff_versions:
             outcome = _finish_diff_page(output_dir, settings, http, entry, publisher)
         else:
             outcome = _finish_page(output_dir, settings, fetch, batch_pages, publisher)
+        logger.info("[%s/%s] write %s -> %s%s", index, total, _entry_ref(entry), outcome.status, _outcome_extra(outcome))
         outcomes.append(outcome)
 
     records = [_manifest_row(item) for item in outcomes]
@@ -111,6 +116,15 @@ def run_export(
         key="run-summary",
         description="Export run summary",
     )
+    elapsed = time.monotonic() - started_mono
+    logger.info(
+        "Done ok=%s failed=%s skipped=%s invalid=%s in %.1fs",
+        ok,
+        failed,
+        skipped,
+        len(invalid_urls),
+        elapsed,
+    )
     return 1 if failed else 0
 
 
@@ -120,42 +134,20 @@ def _fetch_all(
     entries: Sequence[AcceptedEntry],
     settings: Settings,
 ) -> list[PageFetchResult]:
-    if not entries:
-        return []
-    workers = max(1, settings.export_concurrency)
-
-    # Single thread mode (KISS) - avoid ThreadPoolExecutor entirely
-    if workers == 1:
-        return [_fetch_one(client, output_dir, entry, settings.export_force_refresh) for entry in entries]
-
-    results: list[PageFetchResult | None] = [None] * len(entries)
-
-    def work(index: int, entry: AcceptedEntry) -> tuple[int, PageFetchResult]:
-        return index, _fetch_one(client, output_dir, entry, settings.export_force_refresh)
-
-    with ThreadPoolExecutor(max_workers=workers) as pool:
-        future_to_index = {
-            pool.submit(work, index, entry): index for index, entry in enumerate(entries)
-        }
-        for future in as_completed(future_to_index):
-            index = future_to_index[future]
-            try:
-                _, result = future.result()
-                results[index] = result
-            except Exception as exc:
-                entry = entries[index]
-                results[index] = PageFetchResult(
-                    "failed",
-                    str(exc),
-                    entry.page_id,
-                    entry.space_key,
-                    entry.title,
-                    None,
-                )
-    return [
-        item if item is not None else PageFetchResult("failed", "missing", None, None, None, None)
-        for item in results
-    ]
+    total = len(entries)
+    results: list[PageFetchResult] = []
+    for index, entry in enumerate(entries, start=1):
+        fetch = _fetch_one(client, output_dir, entry, settings.export_force_refresh)
+        logger.info(
+            "[%s/%s] fetch %s -> %s%s",
+            index,
+            total,
+            _entry_ref(entry),
+            fetch.status,
+            _fetch_extra(fetch),
+        )
+        results.append(fetch)
+    return results
 
 
 def _fetch_one(
@@ -488,11 +480,41 @@ def _summary_markdown(
     return "\n".join(lines) + "\n"
 
 
-def _publish_markdown(*, markdown: str, key: str | None = None, description: str | None = None) -> Any:
-    try:
-        return create_markdown_artifact(markdown=markdown, key=key, description=description)
-    except Exception:
-        return None
+def _noop_publish(*, markdown: str, key: str | None = None, description: str | None = None) -> None:
+    return None
+
+
+def _entry_ref(entry: AcceptedEntry) -> str:
+    if entry.is_diff and entry.diff_versions:
+        v1, v2 = entry.diff_versions
+        return f"diff {entry.page_id} v{v1}->{v2}"
+    if entry.page_id:
+        return f"page {entry.page_id}"
+    if entry.space_key and entry.title:
+        return f"{entry.space_key}/{entry.title}"
+    return entry.raw
+
+
+def _fetch_extra(fetch: PageFetchResult) -> str:
+    bits: list[str] = []
+    if fetch.title:
+        bits.append(f"«{fetch.title}»")
+    if fetch.status == "ok" and fetch.raw and fetch.raw.get("version") is not None:
+        bits.append(f"v{fetch.raw['version']}")
+    if fetch.status != "ok" and fetch.error:
+        bits.append(f"({fetch.error})")
+    return (" " + " ".join(bits)) if bits else ""
+
+
+def _outcome_extra(outcome: PageOutcome) -> str:
+    bits: list[str] = []
+    if outcome.title:
+        bits.append(f"«{outcome.title}»")
+    if outcome.status == "ok" and outcome.md_path:
+        bits.append(outcome.md_path)
+    if outcome.error:
+        bits.append(f"({outcome.error})")
+    return (" " + " ".join(bits)) if bits else ""
 
 
 def _now() -> str:

@@ -22,7 +22,6 @@ def _settings(**overrides: object) -> Settings:
         "confluence_max_retries": 3,
         "export_output_dir": "data",
         "export_input_file": "input/urls.txt",
-        "export_concurrency": 2,
         "export_force_refresh": False,
         "log_level": "INFO",
     }

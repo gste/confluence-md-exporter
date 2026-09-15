@@ -12,7 +12,7 @@ from confluence_md_exporter.settings import Settings
 BASE = "https://confluence.example.com"
 
 
-def _settings(tmp_path: Path, urls: Path, *, concurrency: int = 2) -> Settings:
+def _settings(tmp_path: Path, urls: Path) -> Settings:
     return Settings(
         confluence_base_url=BASE,
         confluence_edition="datacenter",
@@ -24,7 +24,6 @@ def _settings(tmp_path: Path, urls: Path, *, concurrency: int = 2) -> Settings:
         confluence_max_retries=3,
         export_output_dir=str(tmp_path / "data"),
         export_input_file=str(urls),
-        export_concurrency=concurrency,
         export_force_refresh=True,
         log_level="INFO",
     )
