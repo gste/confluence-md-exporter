@@ -4,7 +4,7 @@
 
 Локальная read-only выгрузка страниц **Confluence Server/Data Center** в Markdown: тело страницы, вложения, сравнение версий и отчёт батча.
 
-Не пишет в Confluence, не обходит дерево descendants и не ходит в Cloud. Python `>=3.11,<3.14`.
+Не пишет в Confluence, не обходит дерево descendants и не ходит в Cloud. Python `>=3.11,<3.15`.
 
 ## Установка
 
