@@ -29,8 +29,8 @@ Examples:
   confluence-md-exporter -i urls.txt -o output -t PAT
       private instance, Personal Access Token (Bearer)
 
-  confluence-md-exporter -i urls.txt -o output -u USER -t TOKEN
-      private instance, HTTP Basic (username + PAT/password)
+  confluence-md-exporter -i urls.txt -o output -u USER -p PASSWORD
+      private instance, HTTP Basic (username + password)
 
   confluence-md-exporter -i ids.txt -o output -b https://confluence.example.com
       page ids only, base URL set explicitly
@@ -40,6 +40,9 @@ Examples:
 
   confluence-md-exporter -i urls.txt -o output -r
       do not skip pages whose version is already on disk
+
+  confluence-md-exporter -i urls.txt -o output -v
+      run with verbose debug logging enabled
 
 Exit codes: 0 ok/skipped; 1 some pages failed; 2 config, auth, or missing input file.
 """
@@ -54,6 +57,7 @@ def build_parser() -> argparse.ArgumentParser:
         ),
         epilog=_HELP_EPILOG,
         formatter_class=argparse.RawDescriptionHelpFormatter,
+        add_help=True,
     )
     parser.add_argument(
         "--version",
@@ -100,7 +104,15 @@ def build_parser() -> argparse.ArgumentParser:
         dest="username",
         metavar="USER",
         default=None,
-        help="username; with -t uses HTTP Basic",
+        help="username for HTTP Basic authentication (requires -p / --password)",
+    )
+    parser.add_argument(
+        "-p",
+        "--password",
+        dest="password",
+        metavar="PASS",
+        default=None,
+        help="password for HTTP Basic authentication (used with -u / --username)",
     )
     parser.add_argument(
         "-t",
@@ -109,7 +121,7 @@ def build_parser() -> argparse.ArgumentParser:
         dest="token",
         metavar="TOKEN",
         default=None,
-        help="Personal Access Token or password; -t alone uses Bearer",
+        help="Personal Access Token for Bearer authentication (do not use with -u)",
     )
     parser.add_argument(
         "-b",
@@ -118,6 +130,14 @@ def build_parser() -> argparse.ArgumentParser:
         metavar="URL",
         default=None,
         help="instance base URL if it cannot be inferred from the list",
+    )
+    parser.add_argument(
+        "-v",
+        "--verbose",
+        dest="verbose",
+        action="store_true",
+        default=False,
+        help="enable verbose debug logging",
     )
     parser.add_argument(
         "-s",
@@ -139,6 +159,7 @@ def configure_logging(level: str) -> None:
         level=getattr(logging, level),
         format="%(asctime)s %(levelname)-7s %(message)s",
         datefmt="%H:%M:%S",
+        force=True,
     )
 
 
@@ -155,6 +176,7 @@ def main(
 ) -> int:
     try:
         args = parse_cli(argv)
+        log_level = "DEBUG" if getattr(args, "verbose", False) else None
         settings = load_settings(
             environ if environ is not None else os.environ,
             input_file=args.input,
@@ -162,17 +184,26 @@ def main(
             force_refresh=args.force_refresh,
             base_url=args.base_url,
             username=args.username,
+            password=args.password,
             token=args.token,
+            log_level=log_level,
         )
     except ConfigError as exc:
         print(str(exc), file=sys.stderr)
         return 2
 
     configure_logging(settings.log_level)
+    logger = logging.getLogger(__name__)
+
+    if settings.log_level == "DEBUG":
+        logger.debug("Resolved configuration: base_url=%s, auth_type=%s, output_dir=%s, input_file=%s",
+                     settings.confluence_base_url, settings.confluence_auth_type,
+                     settings.export_output_dir, settings.export_input_file)
+
     if settings.confluence_auth_type == "anonymous":
-        logging.getLogger(__name__).info("Access: anonymous")
+        logger.info("Access: anonymous")
     else:
-        logging.getLogger(__name__).info(
+        logger.info(
             "Access: %s%s",
             settings.confluence_auth_type,
             f" user={settings.confluence_username}" if settings.confluence_username else "",
