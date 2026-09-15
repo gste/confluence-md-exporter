@@ -69,7 +69,7 @@ def load_settings(
         environ, "EXPORT_INPUT_FILE", "input/urls.txt"
     )
     export_output = output_dir if output_dir is not None else _optional(
-        environ, "EXPORT_OUTPUT_DIR", "data"
+        environ, "EXPORT_OUTPUT_DIR", "output"
     )
     if force_refresh is None:
         export_force = _boolean(environ, "EXPORT_FORCE_REFRESH", default=False)
