@@ -32,7 +32,7 @@ Examples:
   confluence-md-exporter -i urls.txt -o output -u USER -t TOKEN
       private instance, HTTP Basic (username + PAT/password)
 
-  confluence-md-exporter -i ids.txt -o output --base-url https://confluence.example.com
+  confluence-md-exporter -i ids.txt -o output -b https://confluence.example.com
       page ids only, base URL set explicitly
 
   confluence-md-exporter -i urls.txt -o output -c
@@ -105,12 +105,14 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "-t",
         "--token",
+        "--api-token",
         dest="token",
         metavar="TOKEN",
         default=None,
         help="Personal Access Token or password; -t alone uses Bearer",
     )
     parser.add_argument(
+        "-b",
         "--base-url",
         dest="base_url",
         metavar="URL",
