@@ -22,6 +22,13 @@ def _env(tmp_path: Path, **overrides: str) -> dict[str, str]:
     return env
 
 
+def test_export_output_dir_defaults_to_output(tmp_path: Path) -> None:
+    env = _env(tmp_path)
+    del env["EXPORT_OUTPUT_DIR"]
+    settings = load_settings(env)
+    assert settings.export_output_dir == "output"
+
+
 def test_edition_not_datacenter_rejected(tmp_path: Path) -> None:
     with pytest.raises(ConfigError, match="CONFLUENCE_EDITION"):
         load_settings(_env(tmp_path, CONFLUENCE_EDITION="cloud"))

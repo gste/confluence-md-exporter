@@ -42,7 +42,7 @@
 | `CONFLUENCE_VERIFY_SSL` | нет, default `true` | проверка TLS |
 | `CONFLUENCE_TIMEOUT_SECONDS` | нет, default `30` | HTTP timeout, секунды |
 | `CONFLUENCE_MAX_RETRIES` | нет, default `3` | ретраи на 429/502/503/504 |
-| `EXPORT_OUTPUT_DIR` | нет, default `data` | корень слоёв |
+| `EXPORT_OUTPUT_DIR` | нет, default `output` | корень слоёв |
 | `EXPORT_INPUT_FILE` | нет, default `input/urls.txt` | входной список |
 | `EXPORT_CONCURRENCY` | нет, default `2` | параллелизм страниц, целое ≥ 1 |
 | `EXPORT_FORCE_REFRESH` | нет, default `false` | игнорировать disk-skip |

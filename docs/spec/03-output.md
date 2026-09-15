@@ -4,10 +4,10 @@
 
 ## Layout
 
-Корень — `EXPORT_OUTPUT_DIR` (default `data`):
+Корень — `EXPORT_OUTPUT_DIR` (default `output`):
 
 ```text
-data/
+output/
 ├── 01_raw/<page_id>.json
 ├── 01_raw/<page_id>.assets.json
 ├── 02_interim/<page_id>.html
