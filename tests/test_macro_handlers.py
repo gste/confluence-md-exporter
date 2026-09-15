@@ -212,6 +212,13 @@ def test_time_iso_date() -> None:
     assert result.markdown.strip() == "on 2026-08-31"
 
 
+def test_named_html_entities_in_storage_keep_page_ok() -> None:
+    result = transform_storage("<p>say &ldquo;hi&rdquo; &amp; more</p>")
+    assert not result.failed
+    assert result.error is None
+    assert result.markdown.strip() == "say \u201chi\u201d & more"
+
+
 def test_broken_xml_fails_page() -> None:
     result = transform_storage("<p>unclosed")
     assert result.failed
