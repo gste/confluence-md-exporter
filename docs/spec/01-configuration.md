@@ -40,7 +40,7 @@
 
 Иное значение `CONFLUENCE_AUTH_TYPE` — невозможный старт, код выхода `2`.
 
-CLI-флаги `--user` и `--token` перекрывают соответствующие ключи окружения на время запуска. Файл `.env` не обязателен; если используется, в git не коммитится. Токен в лог и stderr не пишется.
+CLI-флаги `-u` / `--user` и `-t` / `--token` перекрывают соответствующие ключи окружения на время запуска. Файл `.env` не обязателен; если используется, в git не коммитится. Токен в лог и stderr не пишется.
 
 ## Environment keys
 
@@ -97,11 +97,11 @@ CLI принимает как минимум:
 
 | Флаг | Перекрывает | Смысл |
 |---|---|---|
-| `--input` | `EXPORT_INPUT_FILE` | путь к списку URL, default `input/urls.txt` |
-| `--output` | `EXPORT_OUTPUT_DIR` | корень слоёв, default `output` |
-| `--user` | `CONFLUENCE_USERNAME` | username; вместе с `--token` даёт basic |
-| `--token` | `CONFLUENCE_TOKEN` | PAT или password |
-| `--base-url` | `CONFLUENCE_BASE_URL` | база приложения; иначе выводится из входных URL |
+| `-i`, `--input` | `EXPORT_INPUT_FILE` | путь к списку URL, default `input/urls.txt` |
+| `-o`, `--output` | `EXPORT_OUTPUT_DIR` | корень слоёв, default `output` |
+| `-u`, `--user`, `--username` | `CONFLUENCE_USERNAME` | username; вместе с `--token` даёт basic |
+| `-t`, `--token`, `--api-token` | `CONFLUENCE_TOKEN` | PAT или password |
+| `-b`, `--base-url` | `CONFLUENCE_BASE_URL` | база приложения; иначе выводится из входных URL |
 | `--force-refresh` | `EXPORT_FORCE_REFRESH=true` | полная перевыгрузка, disk-skip выключен |
 
 Иные флаги первой версии не добавляют out-of-scope возможностей (Cloud, запись в Confluence, descendants, RAG).
