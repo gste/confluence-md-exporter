@@ -33,6 +33,13 @@ def _env(tmp_path: Path, **overrides: str) -> dict[str, str]:
     return env
 
 
+def test_version_flag(capsys: pytest.CaptureFixture[str]) -> None:
+    with pytest.raises(SystemExit) as exc:
+        parse_cli(["--version"])
+    assert exc.value.code == 0
+    assert "1.0.0" in capsys.readouterr().out
+
+
 def test_exit_2_on_bad_config(tmp_path: Path) -> None:
     export = Mock()
     code = main(

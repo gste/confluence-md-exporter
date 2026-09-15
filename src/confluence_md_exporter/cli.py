@@ -10,6 +10,7 @@ import sys
 from collections.abc import Callable, Mapping, Sequence
 from pathlib import Path
 
+from confluence_md_exporter import __version__
 from confluence_md_exporter.client import ConfluenceClient
 from confluence_md_exporter.flow import run_export as default_run_export
 from confluence_md_exporter.settings import ConfigError, Settings, load_settings
@@ -22,6 +23,11 @@ def parse_cli(argv: Sequence[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         prog="confluence-md-exporter",
         description="Export Confluence Server/Data Center pages to Markdown.",
+    )
+    parser.add_argument(
+        "--version",
+        action="version",
+        version=f"%(prog)s {__version__}",
     )
     parser.add_argument(
         "-i",
