@@ -3,9 +3,7 @@ name = "confluence-md-exporter"
 version = "0.1.0"
 description = "Local read-only export of Confluence Server/Data Center pages to Markdown"
 requires-python = ">=3.11,<3.14"
-dependencies = [
-    "prefect>=3,<4",
-]
+dependencies = []
 
 [project.scripts]
 confluence-md-exporter = "confluence_md_exporter.cli:entry"

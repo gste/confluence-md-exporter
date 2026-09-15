@@ -1,10 +1,11 @@
 from __future__ import annotations
 
 import json
+import logging
 from pathlib import Path
 from typing import Mapping
 
-from confluence_md_exporter.cli import main
+from confluence_md_exporter.cli import main, parse_cli
 from confluence_md_exporter.client import ConfluenceClient, HttpResponse
 from confluence_md_exporter.flow import run_export
 from confluence_md_exporter.settings import Settings
@@ -12,7 +13,7 @@ from confluence_md_exporter.settings import Settings
 BASE = "https://confluence.example.com"
 
 
-def _settings(tmp_path: Path, urls: Path, concurrency: int = 1) -> Settings:
+def _settings(tmp_path: Path, urls: Path) -> Settings:
     return Settings(
         confluence_base_url=BASE,
         confluence_edition="datacenter",
@@ -24,7 +25,6 @@ def _settings(tmp_path: Path, urls: Path, concurrency: int = 1) -> Settings:
         confluence_max_retries=3,
         export_output_dir=str(tmp_path / "data"),
         export_input_file=str(urls),
-        export_concurrency=concurrency,
         export_force_refresh=True,
         log_level="INFO",
     )
@@ -88,7 +88,7 @@ def test_diff_page_export_creates_diff_markdown(tmp_path: Path) -> None:
             )
         return _json(404, {"message": "not found"})
 
-    settings = _settings(tmp_path, urls, concurrency=1)
+    settings = _settings(tmp_path, urls)
     client = ConfluenceClient(settings, transport=transport_handler, sleep=lambda _d: None)
 
     code = run_export(settings, client=client, publish=lambda **_kw: None)
@@ -125,13 +125,16 @@ def test_diff_page_export_creates_diff_markdown(tmp_path: Path) -> None:
     assert report["failed"] == 0
 
 
-def test_cli_simple_flag(tmp_path: Path) -> None:
+def test_cli_accepts_simple_flag_for_compatibility() -> None:
+    args = parse_cli(["-s"])
+    assert args.simple is True
+
+
+def test_run_export_logs_progress(tmp_path: Path, caplog) -> None:
     urls = tmp_path / "urls.txt"
     urls.write_text("https://confluence.example.com/pages/viewpage.action?pageId=50\n", encoding="utf-8")
 
     def transport_handler(url: str, headers: Mapping[str, str] | None = None) -> HttpResponse:
-        if "/rest/api/user/current" in url:
-            return _json(200, {"username": "admin", "userKey": "k1"})
         if "/rest/api/content/50" in url:
             return _json(
                 200,
@@ -139,11 +142,11 @@ def test_cli_simple_flag(tmp_path: Path) -> None:
                     "id": "50",
                     "type": "page",
                     "status": "current",
-                    "title": "Simple Flag Test",
+                    "title": "Progress Log Test",
                     "space": {"key": "TEST"},
                     "version": {"number": 1, "when": "2026-01-01T00:00:00Z", "by": {"displayName": "Tester"}},
                     "history": {"createdBy": {"displayName": "Tester"}},
-                    "body": {"storage": {"value": "<p>Simple single-thread test</p>"}},
+                    "body": {"storage": {"value": "<p>hello</p>"}},
                     "metadata": {"labels": {"results": []}},
                     "ancestors": [],
                     "_links": {"webui": "/pages/viewpage.action?pageId=50"},
@@ -153,28 +156,17 @@ def test_cli_simple_flag(tmp_path: Path) -> None:
             return _json(200, {"results": [], "_links": {}})
         return _json(404, {})
 
-    def auth_probe(settings: Settings) -> None:
-        ConfluenceClient(settings, transport=transport_handler, sleep=lambda _d: None).probe()
-
-    def run_exp(settings: Settings) -> int:
-        assert settings.export_concurrency == 1
-        client = ConfluenceClient(settings, transport=transport_handler, sleep=lambda _d: None)
-        return run_export(settings, client=client, publish=lambda **_kw: None)
-
-    code = main(
-        argv=["-s", "--input", str(urls), "--output", str(tmp_path / "data")],
-        environ={
-            "CONFLUENCE_BASE_URL": BASE,
-            "CONFLUENCE_AUTH_TYPE": "bearer",
-            "CONFLUENCE_TOKEN": "token",
-            "EXPORT_INPUT_FILE": str(urls),
-            "EXPORT_OUTPUT_DIR": str(tmp_path / "data"),
-            "EXPORT_CONCURRENCY": "8",
-        },
-        run_export=run_exp,
-        auth_probe=auth_probe,
-    )
+    settings = _settings(tmp_path, urls)
+    client = ConfluenceClient(settings, transport=transport_handler, sleep=lambda _d: None)
+    with caplog.at_level(logging.INFO, logger="confluence_md_exporter.flow"):
+        code = run_export(settings, client=client, publish=lambda **_kw: None)
     assert code == 0
+    text = caplog.text
+    assert "Export 1 page(s), 0 invalid URL(s)" in text
+    assert "[1/1] fetch page 50 -> ok" in text
+    assert "«Progress Log Test»" in text
+    assert "[1/1] write page 50 -> ok" in text
+    assert "Done ok=1 failed=0 skipped=0 invalid=0" in text
 
 
 def test_cli_clean_flag(tmp_path: Path) -> None:

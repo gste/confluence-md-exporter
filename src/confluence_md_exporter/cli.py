@@ -60,13 +60,17 @@ def parse_cli(argv: Sequence[str] | None = None) -> argparse.Namespace:
         dest="simple",
         action="store_true",
         default=False,
-        help="Run simple single-threaded export without Prefect orchestration (KISS mode)",
+        help="Ignored: export is always single-threaded",
     )
     return parser.parse_args(list(argv) if argv is not None else None)
 
 
 def configure_logging(level: str) -> None:
-    logging.basicConfig(level=getattr(logging, level), format="%(levelname)s %(message)s")
+    logging.basicConfig(
+        level=getattr(logging, level),
+        format="%(asctime)s %(levelname)-7s %(message)s",
+        datefmt="%H:%M:%S",
+    )
 
 
 def _default_auth_probe(settings: Settings) -> None:
@@ -87,7 +91,6 @@ def main(
             input_file=args.input,
             output_dir=args.output,
             force_refresh=args.force_refresh,
-            concurrency=1 if args.simple else None,
         )
     except ConfigError as exc:
         print(str(exc), file=sys.stderr)
