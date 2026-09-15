@@ -62,8 +62,9 @@ class ConfluenceClient:
 
     def probe(self) -> None:
         response = self._request(self._url(PROBE_PATH))
-        if response.status == 401:
-            raise AuthError("authentication failed")
+        reason = _probe_failure_reason(response)
+        if reason is not None:
+            raise AuthError(reason)
 
     def fetch_version(self, page_id: str) -> int | None:
         query = urllib.parse.urlencode({"expand": "version"})
@@ -221,6 +222,23 @@ class ConfluenceClient:
             return HttpResponse(int(exc.code), exc.read() if exc.fp else b"", dict(exc.headers or {}))
         except urllib.error.URLError as exc:
             raise ConfigError(f"HTTP request failed: {exc.reason}") from exc
+
+
+_USER_IDENTITY_KEYS = ("username", "userKey", "accountId")
+
+
+def _probe_failure_reason(response: HttpResponse) -> str | None:
+    if response.status != 200:
+        return f"auth probe failed: HTTP {response.status}"
+    try:
+        payload = response.json()
+    except (json.JSONDecodeError, UnicodeDecodeError, ValueError):
+        return "auth probe failed: response is not JSON"
+    if not isinstance(payload, dict):
+        return "auth probe failed: response is not JSON"
+    if not any(payload.get(key) for key in _USER_IDENTITY_KEYS):
+        return "auth probe failed: no user identity"
+    return None
 
 
 def _retry_delay(headers: Mapping[str, str], attempt: int) -> float:

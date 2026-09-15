@@ -49,7 +49,7 @@ def test_retries_429_and_5xx_respect_retry_after() -> None:
         [
             _json(429, {}, {"Retry-After": "5"}),
             _json(503, {}),
-            _json(200, {"name": "jdoe"}),
+            _json(200, {"username": "jdoe"}),
         ]
     )
     client = ConfluenceClient(_settings(), transport=transport, sleep=sleeps.append)
