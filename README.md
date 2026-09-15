@@ -1,10 +1,22 @@
 # confluence-md-exporter
 
-Локальный read-only конвейер: выгрузка страниц Confluence Server/Data Center → Markdown, медиа-ассеты, diff-сравнение версий и каталог батча. Закон реализации — [`docs/spec/README.md`](docs/spec/README.md).
+Локальный read-only конвейер: выгрузка страниц Confluence Server/Data Center → Markdown, медиа-ассеты, diff-сравнение версий и каталог батча. Закон реализации — [спецификация](https://github.com/gste/confluence-md-exporter/blob/master/docs/spec/README.md).
 
 ## Установка
 
-Требуется Python `>=3.11,<3.14`. Пакетный менеджер — `uv`.
+Требуется Python `>=3.11,<3.14`.
+
+```bash
+pip install confluence-md-exporter
+```
+
+Или через `uv`:
+
+```bash
+uv tool install confluence-md-exporter
+```
+
+Из исходников:
 
 ```bash
 uv sync
@@ -32,7 +44,7 @@ uv run confluence-md-exporter -u USER -t TOKEN
 uv run confluence-md-exporter -t TOKEN
 ```
 
-`.env` не обязателен. Если удобнее держать креды в файле — [`.env.example`](.env.example) и `uv run --env-file .env confluence-md-exporter`. CLI-флаги перекрывают окружение.
+`.env` не обязателен. Если удобнее держать креды в файле — [`.env.example`](https://github.com/gste/confluence-md-exporter/blob/master/.env.example) и `uv run --env-file .env confluence-md-exporter`. CLI-флаги перекрывают окружение.
 
 ---
 
@@ -58,10 +70,11 @@ uv run confluence-md-exporter -t TOKEN
 ## CLI команды и флаги
 
 ```text
-usage: confluence-md-exporter [-h] [-i INPUT] [-o OUTPUT] [-u USER] [-t TOKEN]
-                              [--base-url URL] [-r] [-c] [-s]
+usage: confluence-md-exporter [-h] [--version] [-i INPUT] [-o OUTPUT]
+                              [-u USER] [-t TOKEN] [--base-url URL] [-r] [-c] [-s]
 
 options:
+  --version             Версия пакета
   -i, --input INPUT     Список URL (default: input/urls.txt)
   -o, --output OUTPUT   Каталог выгрузки (default: output)
   -u, --user USER       Имя пользователя (вместе с -t — HTTP Basic)
