@@ -1,0 +1,37 @@
+# Copied once by the DeltaFuse installer. Product-owned: edit freely.
+# Runs `deltafuse leash`, then the product's pytest (not the framework suite).
+name: DeltaFuse leash
+
+on:
+  pull_request:
+  push:
+    branches: [main, master]
+
+jobs:
+  leash:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install pinned DeltaFuse
+        run: |
+          set -e
+          if [ -d delta-fuse ]; then
+            python -m pip install -e ./delta-fuse
+          elif [ -d vendor/delta-fuse ]; then
+            python -m pip install -e ./vendor/delta-fuse
+          else
+            echo "Checkout the framework version pinned in .deltafuse/lock.yaml (submodule or vendor path), then re-run." >&2
+            exit 1
+          fi
+      - name: Leash
+        run: python -m deltafuse leash .
+      - name: Product tests
+        run: |
+          if [ -d tests ]; then
+            python -m pytest -q
+          fi
