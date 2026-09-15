@@ -1,0 +1,32 @@
+﻿schema_version: 2
+
+framework:
+  source: deltafuse://v2.5.0
+  version: 2.5.0
+
+paths:
+  intake: docs/intake
+  changes: docs/changes
+  specification: docs/spec
+  decisions: docs/decisions
+  archive: docs/archive
+
+context:
+  max_tokens: 16000
+  max_files: 24
+
+workflow:
+  call_width: wide
+  auto_accept_decisions: false
+  leash: "off"
+
+project:
+  baseline: accepted
+  capability_catalog: docs/spec/_capabilities.yaml
+
+adapters:
+  mode: auto
+  roots:
+    - .agents/skills
+    - .cursor/skills
+    - .gemini/skills
