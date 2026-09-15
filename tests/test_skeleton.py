@@ -8,9 +8,8 @@ def test_package_importable() -> None:
     from importlib.metadata import version
 
     assert confluence_md_exporter.__doc__
-    installed = version("confluence-md-exporter")
-    assert confluence_md_exporter.__version__ == installed
-    assert installed.startswith("1.0.1")
+    assert confluence_md_exporter.__version__ == "1.0.1"
+    assert version("confluence-md-exporter") == "1.0.1"
 
 
 def test_export_run_has_no_prefect_or_thread_pool() -> None:
