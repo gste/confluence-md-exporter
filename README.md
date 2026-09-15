@@ -1,30 +1,32 @@
 # confluence-md-exporter
 
-Локальная read-only выгрузка страниц **Confluence Server/Data Center** в Markdown: тело страницы, вложения, сравнение версий и отчёт батча.
+**English** | [Русский](README.ru.md)
 
-Не пишет в Confluence, не обходит дерево descendants и не ходит в Cloud. Python `>=3.11,<3.14`.
+Local read-only export of **Confluence Server/Data Center** pages to Markdown: page body, attachments, version diffs, and a batch report.
 
-## Установка
+It does not write to Confluence, walk descendants, or talk to Cloud. Python `>=3.11,<3.14`.
+
+## Install
 
 ```bash
 pip install confluence-md-exporter
 ```
 
-или
+or
 
 ```bash
 uv tool install confluence-md-exporter
 ```
 
-Проверка: `confluence-md-exporter --version`. Справка: `confluence-md-exporter -h`.
+Check: `confluence-md-exporter --version`. Help: `confluence-md-exporter -h`.
 
-## Сценарии
+## Use cases
 
-Во всех примерах список ссылок — текстовый файл UTF-8, одна строка = одна страница. Строки `#…` и пустые игнорируются.
+In every example the URL list is a UTF-8 text file, one page per line. `#…` lines and blank lines are ignored.
 
-### Открытый инстанс
+### Public instance
 
-Страницы доступны без логина. База берётся из абсолютных URL — `--base-url` не нужен.
+Pages are readable without login. The Confluence base URL is taken from absolute links, so `--base-url` is not needed.
 
 `urls.txt`:
 
@@ -37,25 +39,25 @@ https://confluence.example.com/display/SPACE/Page+Title
 confluence-md-exporter -i urls.txt -o output
 ```
 
-### Закрытый инстанс: Personal Access Token
+### Private instance: Personal Access Token
 
-Токен без имени пользователя → Bearer.
+Token without a username → Bearer.
 
 ```bash
 confluence-md-exporter -i urls.txt -o output -t PAT
 ```
 
-### Закрытый инстанс: логин и пароль (или логин и PAT)
+### Private instance: username and password (or username and PAT)
 
-Имя + токен → HTTP Basic.
+Username + token → HTTP Basic.
 
 ```bash
 confluence-md-exporter -i urls.txt -o output -u USER -t TOKEN
 ```
 
-### В списке только идентификаторы страниц
+### Page ids only
 
-Если строки вида `123456`, а не полные URL, базу нужно указать явно.
+If the list is ids such as `123456` rather than full URLs, the base URL must be set explicitly.
 
 `ids.txt`:
 
@@ -68,9 +70,9 @@ confluence-md-exporter -i urls.txt -o output -u USER -t TOKEN
 confluence-md-exporter -i ids.txt -o output --base-url https://confluence.example.com
 ```
 
-### Сравнить две версии одной страницы
+### Compare two versions of a page
 
-В список — URL diff из Confluence. В `output/05_diffs/` появится Markdown с YAML-метаданными и блоком ` ```diff `.
+Put a Confluence diff URL in the list. Markdown with YAML metadata and a ` ```diff ` block is written under `output/05_diffs/`.
 
 ```text
 https://confluence.example.com/pages/diffpagesbyversion.action?pageId=607636678&selectedPageVersions=41&selectedPageVersions=42
@@ -80,52 +82,52 @@ https://confluence.example.com/pages/diffpagesbyversion.action?pageId=607636678&
 confluence-md-exporter -i urls.txt -o output -t PAT
 ```
 
-### Повторный прогон, обновление, чистый старт
+### Re-run, refresh, clean start
 
-Повторный запуск в тот же `-o` пропускает страницу, если локальная версия совпала с серверной и файлы вложений на месте (disk-skip).
+A second run into the same `-o` skips a page when the local version matches the server and attachment files are still on disk (disk-skip).
 
-| Задача | Команда |
+| Goal | Command |
 |---|---|
-| Докачать только изменившееся | `confluence-md-exporter -i urls.txt -o output` |
-| Перекачать всё, каталог оставить | `confluence-md-exporter -i urls.txt -o output -r` |
-| Удалить выход и выгрузить заново | `confluence-md-exporter -i urls.txt -o output -c` |
+| Fetch only what changed | `confluence-md-exporter -i urls.txt -o output` |
+| Re-fetch everything, keep the directory | `confluence-md-exporter -i urls.txt -o output -r` |
+| Delete the output and export from scratch | `confluence-md-exporter -i urls.txt -o output -c` |
 
-Креды можно держать в `.env` (`CONFLUENCE_TOKEN`, `CONFLUENCE_USERNAME`, …). CLI-флаги перекрывают окружение. Файл `.env` в git не коммитится.
+Credentials can live in `.env` (`CONFLUENCE_TOKEN`, `CONFLUENCE_USERNAME`, …). CLI flags override the environment. Do not commit `.env`.
 
-## Форматы строк во входном файле
+## Input line formats
 
-| Формат | Пример |
+| Kind | Example |
 |---|---|
-| Страница по id | `https://host/pages/viewpage.action?pageId=123456` |
-| Страница в space | `https://host/wiki/spaces/SPACE/pages/123456/Title` |
-| Только id | `123456` (нужен `--base-url`, если в файле нет абсолютных URL) |
-| По space и title | `https://host/display/SPACE/Page+Title` |
-| Diff версий | `…/pages/diffpagesbyversion.action?pageId=…&selectedPageVersions=41&selectedPageVersions=42` |
-| Diff версий | `…/diffpagesbyversion.action?pageId=…&originalVersion=41&revisedVersion=42` |
+| Page by id | `https://host/pages/viewpage.action?pageId=123456` |
+| Page in a space | `https://host/wiki/spaces/SPACE/pages/123456/Title` |
+| Id only | `123456` (needs `--base-url` if the file has no absolute URLs) |
+| Space and title | `https://host/display/SPACE/Page+Title` |
+| Version diff | `…/pages/diffpagesbyversion.action?pageId=…&selectedPageVersions=41&selectedPageVersions=42` |
+| Version diff | `…/diffpagesbyversion.action?pageId=…&originalVersion=41&revisedVersion=42` |
 
-Неподдерживаемые строки (tiny-link `/x/…` и т.п.) попадают в `run_report.json` как `invalid_urls` и не валят батч.
+Unsupported lines (tiny-link `/x/…` and the like) are recorded in `run_report.json` as `invalid_urls` and do not fail the batch.
 
-## Что получается на диске
+## Output layout
 
 ```text
 output/
-├── 01_raw/             # сырой JSON REST API
+├── 01_raw/             # raw REST JSON
 ├── 02_interim/         # Storage XML
-├── 03_assets/          # вложения и картинки (по page_id)
-├── 04_markdown/        # итоговый Markdown и manifest.json
-├── 05_diffs/           # unified diff двух версий (*_v41_to_v42.md)
-└── run_report.json     # сводка батча
+├── 03_assets/          # attachments and images (per page_id)
+├── 04_markdown/        # Markdown pages and manifest.json
+├── 05_diffs/           # unified diff of two versions (*_v41_to_v42.md)
+└── run_report.json     # batch summary
 ```
 
-## Коды выхода
+## Exit codes
 
-| Код | Когда |
+| Code | When |
 |---|---|
-| `0` | все обработанные страницы `ok` или `skipped` |
-| `1` | хотя бы одна страница `failed` |
-| `2` | нет входного файла, неверная конфигурация или непройденная авторизация |
+| `0` | every processed page is `ok` or `skipped` |
+| `1` | at least one page is `failed` |
+| `2` | missing input file, bad configuration, or failed authentication |
 
-## Разработка
+## Development
 
 ```bash
 uv sync

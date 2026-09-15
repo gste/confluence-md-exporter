@@ -42,7 +42,8 @@ _HELP_EPILOG = """\
       не пропускать страницы, версия которых уже есть на диске
 
 Коды выхода: 0 — ok/skipped; 1 — есть failed; 2 — конфиг, авторизация или нет входного файла.
-Подробнее: https://github.com/gste/confluence-md-exporter#readme
+README: https://github.com/gste/confluence-md-exporter#readme
+Русский: https://github.com/gste/confluence-md-exporter/blob/master/README.ru.md
 """
 
 
