@@ -20,6 +20,21 @@ uv tool install confluence-md-exporter
 
 Check: `confluence-md-exporter --version`. Help: `confluence-md-exporter -h`.
 
+## Troubleshooting
+
+### Command not found
+
+If after installation the `confluence-md-exporter` command is not recognized, try the following:
+
+1. **Alternative execution:** Run the utility directly through Python:
+   ```bash
+   python -m confluence_md_exporter -h
+   ```
+2. **Clean reinstall (if the first step doesn't help):** Try running the terminal as administrator and forcibly reinstall the package:
+   ```bash
+   pip install --force-reinstall confluence-md-exporter
+   ```
+
 ## Use cases
 
 In every example the URL list is a UTF-8 text file, one page per line. `#…` lines and blank lines are ignored.
