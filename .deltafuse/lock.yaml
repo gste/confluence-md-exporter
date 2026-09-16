@@ -2,7 +2,7 @@
 framework:
   version: 2.5.0
   source: deltafuse://v2.5.0
-  content_hash: sha256:8157e01e9b41ea45f7bf097ec2d91746838f5a38
+  content_hash: sha256:6e6811094539265c140e2eeff76288a9d3586363a307433c808597c624faf2f0
 workflow:
   call_width: wide
   auto_accept_decisions: false
